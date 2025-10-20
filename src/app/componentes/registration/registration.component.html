@@ -1,0 +1,93 @@
+<div class="register-container">
+  <div class="register-content">
+
+    <div class="register-form-section">
+      <div class="form-container">
+
+        <div class="app-header">
+          <img src="/media/logo.png" alt="App logo" class="app-logo">
+
+          <h1 class="register-title">Crear Cuenta</h1>
+          <p class="register-subtitle">Únete a la conversación en segundos.</p>
+        </div>
+
+        <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="register-form">
+          <div class="form-group">
+            <input 
+              type="email" 
+              formControlName="email"
+              placeholder="Correo Electrónico *"
+              class="form-input"
+              [class.error]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched"
+            >
+            <div class="error-message" *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+              {{ getErrorMessage('email') }}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <input 
+              type="text" 
+              formControlName="username"
+              placeholder="Nombre de Usuario *"
+              class="form-input"
+              [class.error]="registerForm.get('username')?.invalid && registerForm.get('username')?.touched"
+            >
+            <div class="error-message" *ngIf="registerForm.get('username')?.invalid && registerForm.get('username')?.touched">
+              {{ getErrorMessage('username') }}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <input 
+              type="password" 
+              formControlName="password"
+              placeholder="Contraseña *"
+              class="form-input"
+              [class.error]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched"
+            >
+            <div class="error-message" *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+              {{ getErrorMessage('password') }}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <input 
+              type="password" 
+              formControlName="confirmPassword"
+              placeholder="Verificar Contraseña *"
+              class="form-input"
+              [class.error]="registerForm.get('confirmPassword')?.invalid && registerForm.get('confirmPassword')?.touched"
+            >
+            <div class="error-message" *ngIf="registerForm.get('confirmPassword')?.invalid && registerForm.get('confirmPassword')?.touched">
+              {{ getErrorMessage('confirmPassword') }}
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            class="register-btn"
+            [disabled]="isLoading || registerForm.invalid"
+          >
+            <span *ngIf="!isLoading">Registrarse</span>
+            <span *ngIf="isLoading">Registrando...</span>
+          </button>
+        </form>
+
+        <div class="login-link">
+          <span>¿Ya tienes cuenta? </span>
+          <a routerLink="/" class="login-link-text">Iniciar Sesión</a>
+        </div>
+        
+        </div>
+    </div>
+
+    <div class="background-section">
+      <div class="background-image"></div>
+      <div class="background-overlay">
+        <h2>Chatea sin límites.</h2>
+        <p>Tu privacidad es nuestra prioridad.</p>
+      </div>
+    </div>
+  </div>
+</div>
