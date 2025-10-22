@@ -16,7 +16,7 @@ import { AuthService } from '../../core/services/auth.service';
       <!-- Header -->
       <header class="dashboard-header">
         <div class="header-left">
-          <img src="/media/logo.png" alt="App logo" class="app-logo">
+          <img src="../../../assets/logo.png" alt="App logo" class="app-logo">
           <h1>ChatApp</h1>
         </div>
         <div class="header-right">
