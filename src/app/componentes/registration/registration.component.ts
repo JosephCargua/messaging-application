@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { AuthService } from '../../core/services/auth.service';
 
-// Interfaz para tipar el formulario
+// Form interface
 interface RegisterRequest {
   email: string;
   username: string;
@@ -27,7 +28,7 @@ export class RegisterComponent implements OnInit {
     private fb: FormBuilder,
     private router: Router,
     private snackBar: MatSnackBar,
-    // private authService: AuthService // Descomenta si tienes AuthService
+    private authService: AuthService
   ) {
     this.registerForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
@@ -38,12 +39,9 @@ export class RegisterComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Si tienes authService, descomenta
-    /*
     if (this.authService.isAuthenticated()) {
       this.router.navigate(['/dashboard']);
     }
-    */
   }
 
   passwordMatchValidator(form: FormGroup) {
@@ -62,16 +60,6 @@ export class RegisterComponent implements OnInit {
       this.isLoading = true;
       const registerData: RegisterRequest = this.registerForm.value;
 
-      // Simulación de registro sin AuthService
-      this.snackBar.open('Registro simulado exitoso', 'Cerrar', {
-        duration: 3000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top'
-      });
-      this.isLoading = false;
-
-      // Si tienes AuthService
-      /*
       this.authService.register(registerData).subscribe({
         next: () => {
           this.snackBar.open('Registro exitoso', 'Cerrar', {
@@ -82,7 +70,7 @@ export class RegisterComponent implements OnInit {
           this.router.navigate(['/dashboard']);
         },
         error: (error) => {
-          this.snackBar.open(error.message || 'Error al registrarse', 'Cerrar', {
+          this.snackBar.open(error.error?.message || 'Error al registrarse', 'Cerrar', {
             duration: 3000,
             horizontalPosition: 'center',
             verticalPosition: 'top'
@@ -90,7 +78,6 @@ export class RegisterComponent implements OnInit {
           this.isLoading = false;
         }
       });
-      */
     } else {
       this.markFormGroupTouched();
     }

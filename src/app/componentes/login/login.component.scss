@@ -1,6 +1,6 @@
-/* Definición de Variables */
-$primary-color: #0084ff; // Azul vibrante de mensajería
-$background-color: #95dbe586; // Fondo de la pantalla completa
+/* Variables */
+$primary-color: #0084ff;
+$background-color: #95dbe586;
 $text-color: #333;
 $light-text-color: #666;
 $border-color: #ddd;
@@ -9,9 +9,7 @@ $border-radius: 12px;
 $input-radius: 8px;
 
 
-/* ----------------------------------- */
-/* 1. Contenedor Principal (Layout)    */
-/* ----------------------------------- */
+/* Main Container */
 .login-container {
     height: 100vh;
     width: 100vw;
@@ -39,9 +37,7 @@ $input-radius: 8px;
     overflow: hidden;
 }
 
-/* ----------------------------------- */
-/* 2. Lado Izquierdo (Formulario)      */
-/* ----------------------------------- */
+/* Form Section */
 .login-form-section {
     flex: 1;
     padding: 50px 40px;
@@ -253,4 +249,43 @@ $input-radius: 8px;
         font-size: 18px;
         font-weight: 300;
     }
+}
+
+/* ----------------------------------- */
+/* 6. OAuth Processing State           */
+/* ----------------------------------- */
+.oauth-processing {
+    text-align: center;
+    padding: 40px 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: $border-radius;
+    margin: 20px 0;
+}
+
+.processing-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid $primary-color;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.oauth-processing h3 {
+    color: $text-color;
+    margin: 0 0 10px 0;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.oauth-processing p {
+    color: $light-text-color;
+    margin: 0;
+    font-size: 16px;
 }
