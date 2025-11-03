@@ -1,0 +1,131 @@
+<div class="chat-container">
+  <!-- Left Column: Chat List -->
+  <div class="chat-list-column">
+    <div class="chat-header">
+      <h2>Chats</h2>
+      <button class="add-chat-btn">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+
+    <div class="search-container">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input type="text" placeholder="Buscar" class="search-input">
+    </div>
+
+    <div class="nav-tabs">
+      <button class="nav-tab" [class.active]="activeTab==='chat'" (click)="activeTab='chat'">Chats</button>
+      <button class="nav-tab" [class.active]="activeTab==='call'" (click)="activeTab='call'">Llamadas</button>
+    </div>
+
+    <div class="chat-list">
+      <div *ngFor="let chat of chats" 
+           class="chat-item" 
+           [class.active]="chat.id === activeChatId" 
+           (click)="selectChat(chat.id)">
+        <div class="avatar-container">
+          <img [src]="chat.avatar" [alt]="chat.name" class="avatar">
+          <span *ngIf="chat.isOnline" class="online-indicator"></span>
+        </div>
+        <div class="chat-info">
+          <div class="chat-header-info">
+            <span class="chat-name">{{ chat.name }}</span>
+            <span class="chat-time">{{ chat.timestamp }}</span>
+          </div>
+          <div class="chat-message-preview">{{ chat.lastMessage }}</div>
+        </div>
+        <div *ngIf="chat.unreadCount" class="unread-badge">{{ chat.unreadCount }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Middle Column: Active Chat -->
+  <div class="active-chat-column">
+    <div class="chat-window-header">
+      <div class="chat-window-header-left">
+        <img [src]="activeChat?.avatar" [alt]="activeChat?.name" class="header-avatar">
+        <div>
+          <div class="header-name">{{ activeChat?.name }}</div>
+          <div class="header-members">Leslie Coello, Shirley Amaguaña, Ariel Masaquiza, Sebastian Ortiz</div>
+        </div>
+      </div>
+      <div class="chat-window-actions">
+        <button class="action-btn"><mat-icon>phone</mat-icon></button>
+        <button class="action-btn"><mat-icon>search</mat-icon></button>
+        <button class="action-btn"><mat-icon>more_vert</mat-icon></button>
+      </div>
+    </div>
+
+    <div class="messages-container">
+      <div *ngFor="let message of messages" class="message" [class.current-user]="message.isCurrentUser">
+        <img [src]="message.avatar" [alt]="message.sender" class="message-avatar">
+        <div class="message-content">
+          <div class="message-text">{{ message.text }}</div>
+          <img *ngIf="message.image" [src]="message.image" class="message-image" alt="Message image">
+          <div class="message-time">{{ message.time }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="message-input-container">
+      <button class="input-icon-btn"><mat-icon>insert_emoticon</mat-icon></button>
+      <button class="input-icon-btn"><mat-icon>attach_file</mat-icon></button>
+      <input type="text" placeholder="Escribe un mensaje..." class="message-input">
+      <button class="send-btn"><mat-icon>send</mat-icon></button>
+    </div>
+  </div>
+
+  <!-- Right Column: Chat Details -->
+  <div class="chat-details-column">
+    <div class="details-header">
+      <img [src]="activeChat?.avatar" [alt]="activeChat?.name" class="details-avatar">
+      <div class="details-name">{{ activeChat?.name }}</div>
+      <div class="details-username"></div>
+      <div class="details-actions">
+        <button class="detail-action-btn"><mat-icon>phone</mat-icon></button>
+        <button class="detail-action-btn"><mat-icon>videocam</mat-icon></button>
+        <button class="detail-action-btn"><mat-icon>launch</mat-icon></button>
+        <button class="detail-action-btn"><mat-icon>info</mat-icon></button>
+        <button class="detail-action-btn"><mat-icon>more_vert</mat-icon></button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="setting-item">
+        <mat-icon>notifications</mat-icon>
+        <span>Notificationes</span>
+        <mat-slide-toggle [(ngModel)]="notificationOn" class="toggle"></mat-slide-toggle>
+      </div>
+      <div class="setting-item">
+        <mat-icon>volume_up</mat-icon>
+        <span>Sonido</span>
+        <mat-slide-toggle [(ngModel)]="soundOn" class="toggle"></mat-slide-toggle>
+      </div>
+      <div class="setting-item">
+        <mat-icon>download</mat-icon>
+        <span>Guardar en descargas</span>
+        <mat-slide-toggle [(ngModel)]="saveToDownloadsOn" class="toggle"></mat-slide-toggle>
+      </div>
+    </div>
+
+    <div class="members-section">
+      <div class="members-header">
+        <span>Miembros</span>
+        <button class="see-all-btn">Ver Todos</button>
+      </div>
+      <div class="members-list">
+        <div *ngFor="let member of members" class="member-item">
+          <img [src]="member.avatar" [alt]="member.name" class="member-avatar">
+          <span class="member-name">{{ member.name }}</span>
+          <mat-icon class="member-arrow">chevron_right</mat-icon>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-tabs">
+      <button class="content-tab active">Media</button>
+      <button class="content-tab">Link</button>
+      <button class="content-tab">Docs</button>
+    </div>
+  </div>
+</div>
