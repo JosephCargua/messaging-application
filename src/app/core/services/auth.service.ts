@@ -27,7 +27,6 @@ export class AuthService {
     this.loadUserFromStorage();
   }
 
-  // Email/password login
   login(credentials: LoginRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.API_URL}${this.AUTH_ENDPOINTS.login}`, credentials)
       .pipe(
@@ -36,28 +35,23 @@ export class AuthService {
       );
   }
 
-  // User registration
   register(userData: RegisterRequest): Observable<any> {
     return this.http.post(`${this.API_URL}${this.AUTH_ENDPOINTS.register}`, userData)
       .pipe(catchError(this.handleError));
   }
 
-  // Google OAuth login
   loginWithGoogle(): void {
     window.location.href = `${this.API_URL}${this.AUTH_ENDPOINTS.google}`;
   }
 
-  // GitHub OAuth login
   loginWithGithub(): void {
     window.location.href = `${this.API_URL}${this.AUTH_ENDPOINTS.github}`;
   }
 
-  // Microsoft OAuth login
   loginWithMicrosoft(): void {
     window.location.href = `${this.API_URL}${this.AUTH_ENDPOINTS.microsoft}`;
   }
 
-  // Handle OAuth callback
   handleOAuthCallback(code: string, provider: string): Observable<AuthResponse> {
     const callbackData = {
       code: code,
@@ -71,7 +65,6 @@ export class AuthService {
       );
   }
 
-  // Refresh token
   refreshToken(): Observable<RefreshTokenResponse> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
@@ -87,7 +80,6 @@ export class AuthService {
     );
   }
 
-  // User logout
   logout(): Observable<any> {
     const refreshToken = this.getRefreshToken();
     return this.http.post(`${this.API_URL}${this.AUTH_ENDPOINTS.logout}`, {
@@ -98,42 +90,35 @@ export class AuthService {
     );
   }
 
-  // Get current user
   getCurrentUser(): UserPayload | null {
     return this.currentUserSubject.value;
   }
 
-  // Check authentication status
   isAuthenticated(): boolean {
     const token = this.getAccessToken();
     const user = this.currentUserSubject.value;
     return !!(token && user);
   }
 
-  // Get access token
   getAccessToken(): string | null {
     return localStorage.getItem('access_token');
   }
 
-  // Get refresh token
   private getRefreshToken(): string | null {
     return localStorage.getItem('refresh_token');
   }
 
-  // Handle auth success
   private handleAuthSuccess(response: AuthResponse): void {
     localStorage.setItem('access_token', response.access_token);
     localStorage.setItem('refresh_token', response.refresh_token);
     this.currentUserSubject.next(response.user);
   }
 
-  // Update tokens
   private updateTokens(response: RefreshTokenResponse): void {
     localStorage.setItem('access_token', response.access_token);
     localStorage.setItem('refresh_token', response.refresh_token);
   }
 
-  // Load user from storage
   private loadUserFromStorage(): void {
     const token = this.getAccessToken();
     if (token) {
@@ -146,7 +131,6 @@ export class AuthService {
     }
   }
 
-  // Decode JWT token
   private decodeToken(token: string): UserPayload {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -159,14 +143,35 @@ export class AuthService {
     return JSON.parse(jsonPayload);
   }
 
-  // Clear auth data
   private clearAuthData(): void {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     this.currentUserSubject.next(null);
   }
 
-  // Handle errors
+  getProfile(): Observable<{ user: User; message: string }> {
+    return this.http.get<{ user: User; message: string }>(`${this.API_URL}${this.AUTH_ENDPOINTS.me}`)
+      .pipe(catchError(this.handleError));
+  }
+
+  updateProfile(data: { name?: string; avatar?: string }): Observable<{ user: User; message: string }> {
+    return this.http.put<{ user: User; message: string }>(`${this.API_URL}${this.AUTH_ENDPOINTS.me}`, data)
+      .pipe(
+        tap(response => {
+          const currentUser = this.currentUserSubject.value;
+          if (currentUser) {
+            const updatedUser: UserPayload = {
+              ...currentUser,
+              ...(response.user.name && { name: response.user.name }),
+              ...(response.user.avatar && { avatar: response.user.avatar }),
+            };
+            this.currentUserSubject.next(updatedUser);
+          }
+        }),
+        catchError(this.handleError)
+      );
+  }
+
   private handleError = (error: any): Observable<never> => {
     console.error('Auth Service Error:', error);
     if (error.status === 401) {

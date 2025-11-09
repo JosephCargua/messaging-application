@@ -10,7 +10,8 @@ export const environment = {
         google: '/auth/google',
         github: '/auth/github',
         microsoft: '/auth/microsoft',
-        callback: '/auth/oauth/callback'
+        callback: '/auth/oauth/callback',
+        me: '/auth/me'
       },
       users: '/users'
     }

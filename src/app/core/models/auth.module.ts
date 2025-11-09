@@ -34,8 +34,12 @@ export interface LoginRequest {
   export interface User {
     id: number;
     email: string;
+    name?: string;
+    avatar?: string;
     isActive: boolean;
     emailVerified: boolean;
+    isOnline?: boolean;
+    lastSeen?: string;
     createdAt: string;
     updatedAt: string;
     role: 'USER';

@@ -1,6 +1,6 @@
 <div class="chat-container">
   <!-- Left Column: Chat List -->
-  <div class="chat-list-column">
+  <div class="chat-list-column" [class.hidden-mobile]="isMobileView && !showChatList">
     <div class="chat-header">
       <h2>Chats</h2>
       <button class="add-chat-btn">
@@ -10,16 +10,40 @@
 
     <div class="search-container">
       <mat-icon class="search-icon">search</mat-icon>
-      <input type="text" placeholder="Buscar" class="search-input">
+      <input 
+        type="text" 
+        placeholder="Buscar contactos..." 
+        class="search-input"
+        [(ngModel)]="contactSearchQuery"
+        (input)="onContactSearchInput()">
     </div>
 
     <div class="nav-tabs">
-      <button class="nav-tab" [class.active]="activeTab==='chat'" (click)="activeTab='chat'">Chats</button>
-      <button class="nav-tab" [class.active]="activeTab==='call'" (click)="activeTab='call'">Llamadas</button>
+      <button class="nav-tab" [class.active]="activeTab==='chat'" (click)="onTabChange('chat')">
+        Chats
+      </button>
+      <button class="nav-tab" [class.active]="activeTab==='requests'" (click)="onTabChange('requests')">
+        Solicitudes
+        <span *ngIf="pendingRequests.length > 0" class="badge-count">{{ pendingRequests.length }}</span>
+      </button>
+      <button class="nav-tab" [class.active]="activeTab==='archived'" (click)="onTabChange('archived')">
+        Archivados
+      </button>
+      <button class="nav-tab" [class.active]="activeTab==='profile'" (click)="onTabChange('profile')">
+        Perfil
+      </button>
     </div>
 
-    <div class="chat-list">
-      <div *ngFor="let chat of chats" 
+    <!-- Chat List -->
+    <div *ngIf="activeTab === 'chat'" class="chat-list">
+      <div *ngIf="isLoadingChats" class="loading-state">Cargando chats...</div>
+      <div *ngIf="!isLoadingChats && displayedChats.length === 0 && (!contactSearchQuery || contactSearchQuery.trim().length === 0)" class="empty-state">
+        <p>No tienes chats aún. Envía una solicitud de amistad para comenzar a chatear.</p>
+      </div>
+      <div *ngIf="!isLoadingChats && displayedChats.length === 0 && contactSearchQuery && contactSearchQuery.trim().length > 0" class="empty-state">
+        <p>No se encontraron contactos que coincidan con "{{ contactSearchQuery }}"</p>
+      </div>
+      <div *ngFor="let chat of displayedChats" 
            class="chat-item" 
            [class.active]="chat.id === activeChatId" 
            (click)="selectChat(chat.id)">
@@ -32,58 +56,349 @@
             <span class="chat-name">{{ chat.name }}</span>
             <span class="chat-time">{{ chat.timestamp }}</span>
           </div>
-          <div class="chat-message-preview">{{ chat.lastMessage }}</div>
+          <div class="chat-message-preview" [class.new-contact]="chat.lastMessage === 'Nuevo contacto - ¡Envía el primer mensaje!'">
+            {{ formatChatPreview(chat) }}
+          </div>
         </div>
-        <div *ngIf="chat.unreadCount" class="unread-badge">{{ chat.unreadCount }}</div>
+        <div *ngIf="chat.unreadCount && chat.unreadCount > 0" class="unread-badge">{{ chat.unreadCount }}</div>
+      </div>
+    </div>
+
+    <!-- Friend Requests List -->
+    <div *ngIf="activeTab === 'requests'" class="chat-list">
+      <!-- Search Users Section -->
+      <div class="search-users-section">
+        <h3 class="requests-title">Buscar Usuarios</h3>
+        <div class="search-users-container">
+          <mat-icon class="search-icon">search</mat-icon>
+          <input 
+            type="text" 
+            class="search-users-input" 
+            placeholder="Buscar por email o nombre..."
+            [(ngModel)]="userSearchQuery"
+            (input)="onUserSearchInput()">
+          <div *ngIf="isSearchingUsers" class="search-loading">
+            <div class="loading-spinner-small"></div>
+          </div>
+        </div>
+        
+        <!-- Search Results -->
+        <div *ngIf="searchResults.length > 0" class="search-results">
+          <div *ngFor="let user of searchResults" class="search-result-item">
+            <div class="avatar-container">
+              <img 
+                [src]="user.avatar || ('https://ui-avatars.com/api/?name=' + encodeURI(user.name || user.email) + '&background=random')" 
+                [alt]="user.name || user.email" 
+                class="avatar">
+              <span *ngIf="user.isOnline" class="online-indicator"></span>
+            </div>
+            <div class="search-result-info">
+              <div class="search-result-name">{{ user.name || user.email }}</div>
+              <div class="search-result-email">{{ user.email }}</div>
+            </div>
+            <div class="search-result-actions">
+              <button 
+                *ngIf="!isUserInSentRequests(user.id) && !isUserInPendingRequests(user.id) && !isUserAlreadyContact(user.id)"
+                class="send-request-btn" 
+                (click)="sendFriendRequestFromSearch(user.id)">
+                <mat-icon>person_add</mat-icon>
+                Enviar Solicitud
+              </button>
+              <span 
+                *ngIf="isUserInSentRequests(user.id)" 
+                class="request-status-badge sent">
+                Solicitud Enviada
+              </span>
+              <span 
+                *ngIf="isUserInPendingRequests(user.id)" 
+                class="request-status-badge pending">
+                Solicitud Pendiente
+              </span>
+              <span 
+                *ngIf="isUserAlreadyContact(user.id)" 
+                class="request-status-badge contact">
+                Ya es Contacto
+              </span>
+            </div>
+          </div>
+        </div>
+        <div *ngIf="userSearchQuery && userSearchQuery.trim().length >= 2 && searchResults.length === 0 && !isSearchingUsers" class="empty-state">
+          <p>No se encontraron usuarios</p>
+        </div>
+      </div>
+
+      <div class="requests-section">
+        <h3 class="requests-title">Solicitudes Pendientes</h3>
+        <div *ngIf="pendingRequests.length === 0" class="empty-state">
+          <p>No tienes solicitudes pendientes</p>
+        </div>
+        <div *ngFor="let request of pendingRequests" class="request-item">
+          <div class="avatar-container">
+            <img [src]="request.user?.avatar || ('https://ui-avatars.com/api/?name=' + encodeURI(request.user?.name || 'Usuario'))" 
+                 [alt]="request.user?.name" class="avatar">
+          </div>
+          <div class="request-info">
+            <div class="request-name">{{ request.user?.name || request.user?.email }}</div>
+            <div class="request-actions">
+              <button class="accept-btn" (click)="acceptFriendRequest(request.user!.id)">
+                <mat-icon>check</mat-icon> Aceptar
+              </button>
+              <button class="reject-btn" (click)="rejectFriendRequest(request.user!.id)">
+                <mat-icon>close</mat-icon> Rechazar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="requests-section">
+        <h3 class="requests-title">Solicitudes Enviadas</h3>
+        <div *ngIf="sentRequests.length === 0" class="empty-state">
+          <p>No has enviado solicitudes</p>
+        </div>
+        <div *ngFor="let request of sentRequests" class="request-item">
+          <div class="avatar-container">
+            <img [src]="request.contact?.avatar || ('https://ui-avatars.com/api/?name=' + encodeURI(request.contact?.name || 'Usuario'))" 
+                 [alt]="request.contact?.name" class="avatar">
+          </div>
+          <div class="request-info">
+            <div class="request-name">{{ request.contact?.name || request.contact?.email }}</div>
+            <div class="request-status">Pendiente</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Archived Chats List -->
+    <div *ngIf="activeTab === 'archived'" class="chat-list">
+      <div *ngIf="isLoadingChats" class="loading-state">Cargando chats archivados...</div>
+      <div *ngIf="!isLoadingChats && displayedArchivedChats.length === 0 && (!contactSearchQuery || contactSearchQuery.trim().length === 0)" class="empty-state">
+        <p>No tienes chats archivados</p>
+      </div>
+      <div *ngIf="!isLoadingChats && displayedArchivedChats.length === 0 && contactSearchQuery && contactSearchQuery.trim().length > 0" class="empty-state">
+        <p>No se encontraron chats archivados que coincidan con "{{ contactSearchQuery }}"</p>
+      </div>
+      <div *ngFor="let chat of displayedArchivedChats" 
+           class="chat-item archived-chat" 
+           [class.active]="chat.id === activeChatId" 
+           (click)="selectChat(chat.id)">
+        <div class="avatar-container">
+          <img [src]="chat.avatar" [alt]="chat.name" class="avatar">
+          <span *ngIf="chat.isOnline" class="online-indicator"></span>
+        </div>
+        <div class="chat-info">
+          <div class="chat-header-info">
+            <span class="chat-name">{{ chat.name }}</span>
+            <span class="chat-time">{{ chat.timestamp }}</span>
+          </div>
+          <div class="chat-message-preview">
+            {{ formatChatPreview(chat) || 'Sin mensajes' }}
+          </div>
+        </div>
+        <div *ngIf="chat.unreadCount && chat.unreadCount > 0" class="unread-badge">{{ chat.unreadCount }}</div>
+        <button class="unarchive-btn" (click)="unarchiveChat(chat.contactId); $event.stopPropagation()" title="Desarchivar chat">
+          <mat-icon>unarchive</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Profile Section -->
+    <div *ngIf="activeTab === 'profile'" class="profile-section">
+      <div class="profile-container">
+        <h3 class="profile-title">Mi Perfil</h3>
+        
+        <div class="profile-avatar-section">
+          <div class="avatar-preview">
+            <img 
+              [src]="profileData.avatar || (currentUser && currentUser.email ? 'https://ui-avatars.com/api/?name=' + encodeURI(currentUser.email) + '&background=random' : 'https://ui-avatars.com/api/?name=Usuario&background=random')" 
+              [alt]="profileData.name || 'Avatar'" 
+              class="profile-avatar">
+            <div class="avatar-overlay">
+              <mat-icon>camera_alt</mat-icon>
+              <span>Cambiar foto</span>
+            </div>
+          </div>
+          <p class="avatar-note">* La funcionalidad de subir imagen se implementará próximamente</p>
+        </div>
+
+        <div class="profile-form">
+          <div class="form-group">
+            <label for="profile-name">Nombre</label>
+            <input 
+              type="text" 
+              id="profile-name"
+              class="form-input" 
+              [(ngModel)]="profileData.name" 
+              placeholder="Ingresa tu nombre"
+              maxlength="100">
+          </div>
+
+          <div class="form-group">
+            <label for="profile-email">Email</label>
+            <input 
+              type="email" 
+              id="profile-email"
+              class="form-input" 
+              [value]="profileData.email || (currentUser && currentUser.email ? currentUser.email : '')" 
+              disabled>
+            <span class="form-note">El email no se puede modificar</span>
+          </div>
+
+          <div class="form-actions">
+            <button 
+              class="save-btn" 
+              (click)="saveProfile()" 
+              [disabled]="isSavingProfile || !profileData.name?.trim()">
+              <mat-icon *ngIf="!isSavingProfile">save</mat-icon>
+              <span *ngIf="isSavingProfile">Guardando...</span>
+              <span *ngIf="!isSavingProfile">Guardar Cambios</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="profile-actions">
+          <button class="logout-btn" (click)="logout()">
+            <mat-icon>logout</mat-icon>
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Middle Column: Active Chat -->
-  <div class="active-chat-column">
-    <div class="chat-window-header">
+  <div class="active-chat-column" [class.hidden-mobile]="isMobileView && (showChatList || showDetailsPanel)" [class.expanded]="!showDetailsPanel && !isMobileView">
+    <div *ngIf="activeChat" class="chat-window-header">
       <div class="chat-window-header-left">
-        <img [src]="activeChat?.avatar" [alt]="activeChat?.name" class="header-avatar">
+        <button *ngIf="isMobileView" class="back-btn" (click)="backToChatList()" title="Volver a chats">
+          <mat-icon>arrow_back</mat-icon>
+        </button>
+        <img [src]="activeChat.avatar" [alt]="activeChat.name" class="header-avatar">
         <div>
-          <div class="header-name">{{ activeChat?.name }}</div>
-          <div class="header-members">Leslie Coello, Shirley Amaguaña, Ariel Masaquiza, Sebastian Ortiz</div>
+          <div class="header-name">{{ activeChat.name }}</div>
+          <div class="header-status" [class.online]="activeChat.isOnline">
+            {{ activeChat.isOnline ? 'En línea' : 'Desconectado' }}
+          </div>
         </div>
       </div>
       <div class="chat-window-actions">
-        <button class="action-btn"><mat-icon>phone</mat-icon></button>
-        <button class="action-btn"><mat-icon>search</mat-icon></button>
-        <button class="action-btn"><mat-icon>more_vert</mat-icon></button>
+        <button class="action-btn" (click)="toggleSearchMode()" [class.active]="isSearchMode">
+          <mat-icon>{{ isSearchMode ? 'close' : 'search' }}</mat-icon>
+        </button>
+        <button class="action-btn" (click)="archiveChat(activeChat.contactId)" title="Archivar chat">
+          <mat-icon>archive</mat-icon>
+        </button>
+        <button class="action-btn" (click)="toggleDetailsPanel()" [class.active]="showDetailsPanel">
+          <mat-icon>more_vert</mat-icon>
+        </button>
       </div>
     </div>
 
-    <div class="messages-container">
-      <div *ngFor="let message of messages" class="message" [class.current-user]="message.isCurrentUser">
-        <img [src]="message.avatar" [alt]="message.sender" class="message-avatar">
-        <div class="message-content">
-          <div class="message-text">{{ message.text }}</div>
-          <img *ngIf="message.image" [src]="message.image" class="message-image" alt="Message image">
-          <div class="message-time">{{ message.time }}</div>
+    <!-- Barra de búsqueda -->
+    <div *ngIf="activeChat && isSearchMode" class="search-bar-container">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input 
+        type="text" 
+        placeholder="Buscar en la conversación..." 
+        class="search-input"
+        [(ngModel)]="searchQuery"
+        (keyup.enter)="searchMessages()">
+      <button class="search-btn" (click)="searchMessages()" [disabled]="!searchQuery.trim()">
+        <mat-icon>search</mat-icon>
+      </button>
+    </div>
+
+    <div *ngIf="!activeChat" class="no-chat-selected">
+      <mat-icon class="no-chat-icon">chat_bubble_outline</mat-icon>
+      <p>Selecciona un chat para comenzar a conversar</p>
+    </div>
+
+    <div *ngIf="activeChat" class="messages-container" (scroll)="onMessagesScroll($event)">
+      <!-- Indicador de carga al cargar más mensajes -->
+      <div *ngIf="isLoadingMoreMessages" class="loading-more-messages">
+        <div class="loading-spinner"></div>
+        <span>Cargando más mensajes...</span>
+      </div>
+      
+      <div *ngIf="isLoadingMessages" class="loading-state">Cargando mensajes...</div>
+      <div *ngIf="!isLoadingMessages && messages.length === 0 && !isSearchMode" class="empty-state">
+        <p>No hay mensajes aún. ¡Envía el primero!</p>
+      </div>
+      <div *ngIf="!isLoadingMessages && messages.length === 0 && isSearchMode" class="empty-state">
+        <p>No se encontraron mensajes con "{{ searchQuery }}"</p>
+      </div>
+      
+      <div *ngFor="let message of messages" class="message-wrapper" [class.current-user]="message.isCurrentUser">
+        <div class="message" [class.current-user]="message.isCurrentUser" (contextmenu)="$event.preventDefault()">
+          <img *ngIf="!message.isCurrentUser" [src]="message.avatar" [alt]="message.sender" class="message-avatar">
+          <div class="message-content">
+            <div class="message-text">{{ message.text }}</div>
+            <img *ngIf="message.image" [src]="message.image" class="message-image" alt="Message image">
+            <div class="message-footer">
+              <div class="message-time">{{ message.time }}</div>
+              <!-- Indicadores de visto/no visto solo para mensajes propios -->
+              <div *ngIf="message.isCurrentUser" class="read-indicators">
+                <mat-icon *ngIf="message.isRead" class="read-icon" title="Leído">done_all</mat-icon>
+                <mat-icon *ngIf="!message.isRead" class="unread-icon" title="Enviado">done</mat-icon>
+              </div>
+              <!-- Botón para eliminar mensaje (solo en mensajes propios) -->
+              <button *ngIf="message.isCurrentUser" class="delete-message-btn" (click)="deleteMessage(message.id)" title="Eliminar mensaje">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Indicador de "Escribiendo..." -->
+      <div *ngIf="isTyping && activeChat && !isSearchMode" class="message-wrapper typing-indicator">
+        <div class="message">
+          <img [src]="activeChat.avatar" [alt]="activeChat.name" class="message-avatar">
+          <div class="message-content">
+            <div class="typing-container">
+              <span class="typing-text">Escribiendo</span>
+              <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="message-input-container">
-      <button class="input-icon-btn"><mat-icon>insert_emoticon</mat-icon></button>
-      <button class="input-icon-btn"><mat-icon>attach_file</mat-icon></button>
-      <input type="text" placeholder="Escribe un mensaje..." class="message-input">
-      <button class="send-btn"><mat-icon>send</mat-icon></button>
+    <div *ngIf="activeChat && !isSearchMode" class="message-input-container">
+      <button class="input-icon-btn" title="Grabar nota de voz (próximamente)">
+        <mat-icon>mic</mat-icon>
+      </button>
+      <input 
+        type="text" 
+        placeholder="Escribe un mensaje..." 
+        class="message-input"
+        [(ngModel)]="messageText"
+        (keyup.enter)="sendMessage()"
+        (input)="onMessageInput()"
+        (blur)="onMessageInputBlur()">
+      <button class="send-btn" (click)="sendMessage()" [disabled]="!messageText.trim()">
+        <mat-icon>send</mat-icon>
+      </button>
     </div>
   </div>
 
   <!-- Right Column: Chat Details -->
-  <div class="chat-details-column">
+  <div class="chat-details-column" [class.show]="showDetailsPanel" [class.hidden-mobile]="isMobileView && !showDetailsPanel">
+    <div class="details-panel-header">
+      <h3>Detalles del chat</h3>
+      <button class="close-details-btn" (click)="closeDetailsPanel()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
     <div class="details-header">
       <img [src]="activeChat?.avatar" [alt]="activeChat?.name" class="details-avatar">
       <div class="details-name">{{ activeChat?.name }}</div>
       <div class="details-username"></div>
       <div class="details-actions">
-        <button class="detail-action-btn"><mat-icon>phone</mat-icon></button>
-        <button class="detail-action-btn"><mat-icon>videocam</mat-icon></button>
         <button class="detail-action-btn"><mat-icon>launch</mat-icon></button>
         <button class="detail-action-btn"><mat-icon>info</mat-icon></button>
         <button class="detail-action-btn"><mat-icon>more_vert</mat-icon></button>
@@ -106,21 +421,15 @@
         <span>Guardar en descargas</span>
         <mat-slide-toggle [(ngModel)]="saveToDownloadsOn" class="toggle"></mat-slide-toggle>
       </div>
+      <div class="setting-item" *ngIf="activeChat">
+        <mat-icon>archive</mat-icon>
+        <span>Archivar chat</span>
+        <button class="archive-btn" (click)="archiveChat(activeChat.contactId)" title="Archivar este chat">
+          <mat-icon>archive</mat-icon>
+        </button>
+      </div>
     </div>
 
-    <div class="members-section">
-      <div class="members-header">
-        <span>Miembros</span>
-        <button class="see-all-btn">Ver Todos</button>
-      </div>
-      <div class="members-list">
-        <div *ngFor="let member of members" class="member-item">
-          <img [src]="member.avatar" [alt]="member.name" class="member-avatar">
-          <span class="member-name">{{ member.name }}</span>
-          <mat-icon class="member-arrow">chevron_right</mat-icon>
-        </div>
-      </div>
-    </div>
 
     <div class="content-tabs">
       <button class="content-tab active">Media</button>
