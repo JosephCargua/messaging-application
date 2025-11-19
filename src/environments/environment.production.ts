@@ -9,7 +9,10 @@ export const environment = {
         logout: '/auth/logout',
         google: '/auth/google',
         github: '/auth/github',
-        microsoft: '/auth/microsoft'
+        microsoft: '/auth/microsoft',
+        callback: '/auth/oauth/callback',
+        me: '/auth/me',
+        avatarUpload: '/auth/me/avatar'
       },
       users: '/users'
     }

@@ -15,11 +15,13 @@ export interface LoginRequest {
     user: UserPayload;
   }
   
-  export interface UserPayload {
+export interface UserPayload {
     sub: number;
     email: string;
     roles: string[];
     tenantId?: number;
+    name?: string;
+    avatar?: string;
   }
   
   export interface RefreshTokenRequest {
@@ -45,3 +47,40 @@ export interface LoginRequest {
     role: 'USER';
     tenantId?: number;
   }
+
+  export interface DisplayChat {
+  id: string;
+  name: string;
+  lastMessage: string;
+  lastMessageSenderId?: number;
+  timestamp: string;
+  unreadCount?: number;
+  isOnline: boolean;
+  avatar: string;
+  contactId: number;
+}
+
+export interface DisplayMessage {
+  id: number;
+  sender: string;
+  text: string;
+  time: string;
+  avatar: string;
+  isCurrentUser?: boolean;
+  image?: string;
+  isRead?: boolean;
+  readAt?: string;
+}
+
+export interface ProfileData {
+  name?: string;
+  email?: string;
+  avatar?: string;
+}
+
+export interface MessagesResult {
+  messages: DisplayMessage[];
+  hasMore: boolean;
+  nextCursor: number | null;
+}
+

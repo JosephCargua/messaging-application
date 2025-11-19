@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -11,34 +11,11 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { AuthService } from '../../core/services/auth.service';
-import { MessagesService, Message, Chat } from '../../core/services/messages.service';
-import { ContactsService, Contact, FriendRequest, User } from '../../core/services/contacts.service';
+import { Contact, FriendRequest, User } from '../../core/services/contacts.service';
 import { WebSocketService } from '../../core/services/websocket.service';
+import { DashboardDataService } from '../../core/services/dashboard-data.service';
+import { DisplayChat, DisplayMessage, ProfileData } from '../../core/models/auth.module';
 import { Subscription } from 'rxjs';
-
-interface DisplayChat {
-  id: string;
-  name: string;
-  lastMessage: string;
-  lastMessageSenderId?: number;
-  timestamp: string;
-  unreadCount?: number;
-  isOnline: boolean;
-  avatar: string;
-  contactId: number;
-}
-
-interface DisplayMessage {
-  id: number;
-  sender: string;
-  text: string;
-  time: string;
-  avatar: string;
-  isCurrentUser?: boolean;
-  image?: string;
-  isRead?: boolean;
-  readAt?: string;
-}
 
 @Component({
   selector: 'app-dashboard',
@@ -58,6 +35,8 @@ interface DisplayMessage {
   styleUrls: ['./dashboard.component.scss']
 })
 export class DashboardComponent implements OnInit, OnDestroy {
+  @ViewChild('avatarInput') avatarInputRef?: ElementRef<HTMLInputElement>;
+
   currentUser: any = null;
   activeTab: string = 'chat';
   activeChatId: string | null = null;
@@ -85,9 +64,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isTyping: boolean = false;
   typingTimeout: any = null;
   
-  profileData: { name?: string; email?: string; avatar?: string } = {};
+  profileData: ProfileData = {};
   isSavingProfile = false;
   isLoadingProfile = false;
+  isUploadingAvatar = false;
   
   userSearchQuery = '';
   searchResults: User[] = [];
@@ -122,12 +102,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return this.filteredArchivedChats;
   }
 
+  get profileAvatarUrl(): string {
+    if (this.profileData?.avatar) {
+      return this.profileData.avatar;
+    }
+
+    return this.dashboardDataService.buildFallbackAvatar(
+      this.profileData?.name || this.currentUser?.name,
+      this.profileData?.email || this.currentUser?.email
+    );
+  }
+
   constructor(
     private authService: AuthService,
     private router: Router,
     private snackBar: MatSnackBar,
-    private messagesService: MessagesService,
-    private contactsService: ContactsService,
+    private dashboardDataService: DashboardDataService,
     private websocketService: WebSocketService,
     private dialog: MatDialog,
     private cdr: ChangeDetectorRef
@@ -139,6 +129,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.router.navigate(['/']);
       return;
     }
+
+    const currentUserSub = this.authService.currentUser$.subscribe(user => {
+      this.currentUser = user;
+    });
+    this.subscriptions.push(currentUserSub);
 
     this.checkMobileView();
     window.addEventListener('resize', this.resizeHandler);
@@ -196,20 +191,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadChats(): void {
     this.isLoadingChats = true;
-    this.messagesService.getChats().subscribe({
-      next: (response) => {
-        let loadedChats = response.data.map(chat => ({
-          id: chat.contact.id.toString(),
-          contactId: Number(chat.contact.id),
-          name: chat.contact.name || chat.contact.email,
-          lastMessage: chat.lastMessage?.content || '',
-          lastMessageSenderId: chat.lastMessage?.senderId,
-          timestamp: this.formatTime(chat.lastMessage?.createdAt || new Date().toISOString()),
-          unreadCount: chat.unreadCount || 0,
-          isOnline: chat.contact.isOnline || false,
-          avatar: chat.contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.contact.name || chat.contact.email)}&background=random`
-        }));
-        
+    this.dashboardDataService.fetchChats().subscribe({
+      next: (loadedChats) => {
         const archivedContactIds = new Set(this.archivedChats.map(ac => ac.contactId));
         this.chats = loadedChats.filter(chat => !archivedContactIds.has(chat.contactId));
         this.isLoadingChats = false;
@@ -229,9 +212,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   loadContacts(): void {
-    this.contactsService.getContacts().subscribe({
-      next: (response) => {
-        this.contacts = response.data;
+    this.dashboardDataService.fetchContacts().subscribe({
+      next: (contacts) => {
+        this.contacts = contacts;
         this.mergeContactsWithChats();
       },
       error: (error) => {
@@ -244,19 +227,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (this.activeTab === 'archived') {
       this.isLoadingChats = true;
     }
-    this.messagesService.getArchivedChats().subscribe({
-      next: (response) => {
-        this.archivedChats = response.data.map((chat: any) => ({
-          id: chat.contact.id.toString(),
-          contactId: Number(chat.contact.id),
-          name: chat.contact.name || chat.contact.email,
-          lastMessage: chat.lastMessage?.content || '',
-          lastMessageSenderId: chat.lastMessage?.senderId,
-          timestamp: this.formatTime(chat.lastMessage?.createdAt || chat.archivedAt || new Date().toISOString()),
-          unreadCount: chat.unreadCount || 0,
-          isOnline: chat.contact.isOnline || false,
-          avatar: chat.contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.contact.name || chat.contact.email)}&background=random`
-        }));
+    this.dashboardDataService.fetchArchivedChats().subscribe({
+      next: (archived) => {
+        this.archivedChats = archived;
         this.isLoadingChats = false;
         this.filterChats();
         if (this.chats.length > 0) {
@@ -288,18 +261,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     
     this.contacts.forEach(contact => {
       if (!chatContactIds.has(contact.contact.id) && !archivedContactIds.has(contact.contact.id)) {
-        const newChat: DisplayChat = {
-          id: contact.contact.id.toString(),
-          contactId: contact.contact.id,
-          name: contact.contact.name || contact.contact.email,
-          lastMessage: 'Nuevo contacto - ¡Envía el primer mensaje!',
-          lastMessageSenderId: undefined,
-          timestamp: this.formatTime(contact.createdAt),
-          unreadCount: 0,
-          isOnline: contact.contact.isOnline || false,
-          avatar: contact.contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.contact.name || contact.contact.email)}&background=random`
-        };
-        this.chats.push(newChat);
+        this.chats.push(this.dashboardDataService.createChatFromContact(contact));
       }
     });
     
@@ -323,20 +285,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.isLoadingMoreMessages = true;
     }
 
-    this.messagesService.getMessages(contactId, 20, this.nextCursor || undefined).subscribe({
-      next: (response: any) => {
-        const currentUserId = this.currentUser?.sub;
-        const newMessages: DisplayMessage[] = response.data.map((msg: Message) => ({
-          id: msg.id,
-          sender: msg.sender.name || msg.sender.email,
-          text: msg.content,
-          time: this.formatTime(msg.createdAt),
-          avatar: msg.sender.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender.name || msg.sender.email)}&background=random`,
-          isCurrentUser: msg.senderId === currentUserId,
-          isRead: msg.isRead,
-          readAt: msg.readAt
-        }));
-
+    const currentUserId = this.currentUser?.sub;
+    this.dashboardDataService.fetchMessages(contactId, currentUserId, 20, this.nextCursor || undefined).subscribe({
+      next: (response) => {
+        const newMessages: DisplayMessage[] = response.messages;
         if (append) {
           this.messages = [...newMessages, ...this.messages];
         } else {
@@ -400,9 +352,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   loadPendingRequests(): void {
-    this.contactsService.getPendingRequests().subscribe({
-      next: (response) => {
-        this.pendingRequests = response.data;
+    this.dashboardDataService.fetchPendingRequests().subscribe({
+      next: (requests) => {
+        this.pendingRequests = requests;
       },
       error: (error) => {
         console.error('Error loading pending requests:', error);
@@ -411,9 +363,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   loadSentRequests(): void {
-    this.contactsService.getSentRequests().subscribe({
-      next: (response) => {
-        this.sentRequests = response.data;
+    this.dashboardDataService.fetchSentRequests().subscribe({
+      next: (requests) => {
+        this.sentRequests = requests;
       },
       error: (error) => {
         console.error('Error loading sent requests:', error);
@@ -453,7 +405,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   markMessagesAsRead(contactId: number): void {
-    this.messagesService.markMessagesAsRead(contactId).subscribe({
+    this.dashboardDataService.markMessagesAsRead(contactId).subscribe({
       next: (response) => {
         if (response.data.count > 0 && this.activeChatId) {
           response.data.messageIds.forEach(messageId => {
@@ -496,27 +448,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
       sender: this.currentUser?.email || 'Tú',
       text: messageContent,
       time: 'Ahora',
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(this.currentUser?.email || 'Usuario')}&background=random`,
+      avatar: this.dashboardDataService.resolveAvatar(this.currentUser?.avatar, this.currentUser?.name, this.currentUser?.email),
       isCurrentUser: true
     };
     this.messages.push(tempMessage);
     this.messageText = '';
     setTimeout(() => this.scrollToBottom(), 100);
 
-    this.messagesService.sendMessage(request).subscribe({
-      next: (response) => {
+    this.dashboardDataService.sendMessage(request, currentUserId).subscribe({
+      next: (displayMessage) => {
         const messageIndex = this.messages.findIndex(m => m.id === tempMessage.id);
         if (messageIndex !== -1) {
-          this.messages[messageIndex] = {
-            id: response.data.id,
-            sender: response.data.sender.name || response.data.sender.email,
-            text: response.data.content,
-            time: this.formatTime(response.data.createdAt),
-            avatar: response.data.sender.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(response.data.sender.name || response.data.sender.email)}&background=random`,
-            isCurrentUser: response.data.senderId === currentUserId,
-            isRead: response.data.isRead,
-            readAt: response.data.readAt
-          };
+          this.messages[messageIndex] = displayMessage;
         }
         this.loadChats();
       },
@@ -539,16 +482,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   setupWebSocketListeners(): void {
     const newMessageSub = this.websocketService.onNewMessage().subscribe((event) => {
       const currentUserId = this.currentUser?.sub;
-      const displayMessage: DisplayMessage = {
-        id: event.message.id,
-        sender: event.message.sender.name || event.message.sender.email,
-        text: event.message.content,
-        time: this.formatTime(event.message.createdAt),
-        avatar: event.message.sender.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(event.message.sender.name || event.message.sender.email)}&background=random`,
-        isCurrentUser: event.message.senderId === currentUserId,
-        isRead: event.message.isRead,
-        readAt: event.message.readAt
-      };
+      const displayMessage = this.dashboardDataService.mapRealtimeMessage(event.message, currentUserId);
 
       if (this.activeChatId && this.activeChat?.contactId === event.from) {
         const messageExists = this.messages.some(m => m.id === event.message.id);
@@ -708,24 +642,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.websocketService.emitTypingStop(chat.contactId);
   }
 
-  formatTime(dateString: string): string {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Ahora';
-    if (diffMins < 60) return `Hace ${diffMins}m`;
-    if (diffHours < 24) return `Hace ${diffHours}h`;
-    if (diffDays < 7) return `Hace ${diffDays}d`;
-
-    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  }
-
   acceptFriendRequest(contactId: number): void {
-    this.contactsService.acceptFriendRequest(contactId).subscribe({
+    this.dashboardDataService.acceptFriendRequest(contactId).subscribe({
       next: (response) => {
         this.snackBar.open('Solicitud de amistad aceptada', 'Cerrar', {
           duration: 3000,
@@ -748,7 +666,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   rejectFriendRequest(contactId: number): void {
-    this.contactsService.rejectFriendRequest(contactId).subscribe({
+    this.dashboardDataService.rejectFriendRequest(contactId).subscribe({
       next: (response) => {
         this.snackBar.open('Solicitud de amistad rechazada', 'Cerrar', {
           duration: 3000,
@@ -766,10 +684,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
         });
       }
     });
-  }
-
-  encodeURI(str: string): string {
-    return window.encodeURIComponent(str);
   }
 
   formatChatPreview(chat: DisplayChat): string {
@@ -819,7 +733,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.messagesService.deleteMessage(messageId).subscribe({
+    this.dashboardDataService.deleteMessage(messageId).subscribe({
       next: () => {
         const messageIndex = this.messages.findIndex(m => m.id === messageId);
         if (messageIndex !== -1) {
@@ -844,7 +758,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   archiveChat(contactId: number): void {
-    this.messagesService.archiveChat(contactId).subscribe({
+    this.dashboardDataService.archiveChat(contactId).subscribe({
       next: () => {
         this.snackBar.open('Chat archivado', 'Cerrar', {
           duration: 2000,
@@ -870,7 +784,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   unarchiveChat(contactId: number): void {
-    this.messagesService.unarchiveChat(contactId).subscribe({
+    this.dashboardDataService.unarchiveChat(contactId).subscribe({
       next: () => {
         this.snackBar.open('Chat desarchivado', 'Cerrar', {
           duration: 2000,
@@ -957,9 +871,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     this.isSearchingUsers = true;
-    this.contactsService.searchUsers(this.userSearchQuery.trim()).subscribe({
-      next: (response) => {
-        this.searchResults = response.data;
+    this.dashboardDataService.searchUsers(this.userSearchQuery.trim()).subscribe({
+      next: (users) => {
+        this.searchResults = users;
         this.isSearchingUsers = false;
       },
       error: (error) => {
@@ -971,7 +885,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   sendFriendRequestFromSearch(userId: number): void {
-    this.contactsService.sendFriendRequest({ contactId: userId }).subscribe({
+    this.dashboardDataService.sendFriendRequest(userId).subscribe({
       next: (response) => {
         this.snackBar.open('Solicitud de amistad enviada', 'Cerrar', {
           duration: 3000,
@@ -1013,13 +927,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadProfile(): void {
     this.isLoadingProfile = true;
-    this.authService.getProfile().subscribe({
-      next: (response) => {
-        this.profileData = {
-          name: response.user.name || '',
-          email: response.user.email || '',
-          avatar: response.user.avatar || undefined,
-        };
+    this.dashboardDataService.fetchProfile().subscribe({
+      next: (profile) => {
+        this.profileData = profile;
         this.isLoadingProfile = false;
       },
       error: (error) => {
@@ -1045,15 +955,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     this.isSavingProfile = true;
-    this.authService.updateProfile({
-      name: this.profileData.name.trim(),
-    }).subscribe({
-      next: (response) => {
-        this.profileData = {
-          name: response.user.name || '',
-          email: response.user.email || '',
-          avatar: response.user.avatar || undefined,
-        };
+    this.dashboardDataService.updateProfile(this.profileData.name.trim()).subscribe({
+      next: (profile) => {
+        this.profileData = profile;
         this.isSavingProfile = false;
         this.snackBar.open('Perfil actualizado correctamente', 'Cerrar', {
           duration: 3000,
@@ -1074,6 +978,88 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  triggerAvatarUpload(): void {
+    if (this.isUploadingAvatar) {
+      return;
+    }
+    this.avatarInputRef?.nativeElement.click();
+  }
+
+  onAvatarSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) {
+      return;
+    }
+
+    const file = input.files[0];
+    if (!this.validateAvatarFile(file)) {
+      this.resetAvatarInput();
+      return;
+    }
+
+    this.startAvatarUpload(file);
+  }
+
+  private startAvatarUpload(file: File): void {
+    this.isUploadingAvatar = true;
+    this.dashboardDataService.uploadAvatar(file).subscribe({
+      next: ({ profile, message }) => {
+        this.profileData = {
+          ...this.profileData,
+          avatar: profile.avatar,
+        };
+        this.isUploadingAvatar = false;
+        this.snackBar.open(message || 'Avatar actualizado correctamente', 'Cerrar', {
+          duration: 3000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top'
+        });
+        this.resetAvatarInput();
+        this.loadChats();
+      },
+      error: (error) => {
+        console.error('Error uploading avatar:', error);
+        this.isUploadingAvatar = false;
+        this.snackBar.open(error.error?.message || 'Error al subir el avatar', 'Cerrar', {
+          duration: 3000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top'
+        });
+        this.resetAvatarInput();
+      }
+    });
+  }
+
+  private validateAvatarFile(file: File): boolean {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      this.snackBar.open('Solo se permiten imágenes JPG, PNG o WEBP', 'Cerrar', {
+        duration: 3000,
+        horizontalPosition: 'center',
+        verticalPosition: 'top'
+      });
+      return false;
+    }
+
+    const maxSize = 2 * 1024 * 1024; // 2 MB
+    if (file.size > maxSize) {
+      this.snackBar.open('La imagen debe pesar menos de 2 MB', 'Cerrar', {
+        duration: 3000,
+        horizontalPosition: 'center',
+        verticalPosition: 'top'
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  private resetAvatarInput(): void {
+    if (this.avatarInputRef) {
+      this.avatarInputRef.nativeElement.value = '';
+    }
+  }
+
   toggleSearchMode(): void {
     this.isSearchMode = !this.isSearchMode;
     if (!this.isSearchMode) {
@@ -1090,19 +1076,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!activeChat) return;
 
     this.isLoadingMessages = true;
-    this.messagesService.searchMessages(activeChat.contactId, this.searchQuery.trim()).subscribe({
-      next: (response: any) => {
-        const currentUserId = this.currentUser?.sub;
-        this.messages = response.data.map((msg: Message) => ({
-          id: msg.id,
-          sender: msg.sender.name || msg.sender.email,
-          text: msg.content,
-          time: this.formatTime(msg.createdAt),
-          avatar: msg.sender.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender.name || msg.sender.email)}&background=random`,
-          isCurrentUser: msg.senderId === currentUserId,
-          isRead: msg.isRead,
-          readAt: msg.readAt
-        }));
+    const currentUserId = this.currentUser?.sub;
+    this.dashboardDataService.searchMessages(activeChat.contactId, this.searchQuery.trim(), currentUserId).subscribe({
+      next: (messages) => {
+        this.messages = messages;
         this.isLoadingMessages = false;
       },
       error: (error) => {

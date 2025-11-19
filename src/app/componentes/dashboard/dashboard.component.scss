@@ -1477,7 +1477,17 @@
   transition: opacity 0.3s;
 }
 
+.avatar-preview.uploading {
+  cursor: progress;
+  opacity: 0.8;
+}
+
 .avatar-preview:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-preview.uploading .avatar-overlay,
+.avatar-overlay.visible {
   opacity: 1;
 }
 
