@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
-import { map, catchError, tap } from 'rxjs/operators';
+import { catchError, tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { 
   LoginRequest, 
@@ -111,7 +111,8 @@ export class AuthService {
   private handleAuthSuccess(response: AuthResponse): void {
     localStorage.setItem('access_token', response.access_token);
     localStorage.setItem('refresh_token', response.refresh_token);
-    this.currentUserSubject.next(response.user);
+    const enrichedUser = this.applyAvatarToUser(response.user as any);
+    this.currentUserSubject.next(enrichedUser);
   }
 
   private updateTokens(response: RefreshTokenResponse): void {
@@ -160,16 +161,75 @@ export class AuthService {
         tap(response => {
           const currentUser = this.currentUserSubject.value;
           if (currentUser) {
+            const userWithAvatar = this.applyAvatarToUser(response.user);
             const updatedUser: UserPayload = {
               ...currentUser,
-              ...(response.user.name && { name: response.user.name }),
-              ...(response.user.avatar && { avatar: response.user.avatar }),
+              ...(userWithAvatar.name && { name: userWithAvatar.name }),
+              ...(userWithAvatar.avatar && { avatar: userWithAvatar.avatar }),
             };
             this.currentUserSubject.next(updatedUser);
           }
         }),
         catchError(this.handleError)
       );
+  }
+
+  uploadAvatar(file: File): Observable<{ user: User; avatarUrl: string; message: string }> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    return this.http.post<{ user: User; avatarUrl: string; message: string }>(
+      `${this.API_URL}${this.AUTH_ENDPOINTS.avatarUpload}`,
+      formData
+    ).pipe(
+      tap(response => {
+        const currentUser = this.currentUserSubject.value;
+        if (currentUser) {
+          const avatarSource = response.avatarUrl || response.user.avatar;
+          const userWithAvatar = this.applyAvatarToUser({
+            ...response.user,
+            avatar: avatarSource
+          });
+
+          this.currentUserSubject.next({
+            ...currentUser,
+            ...(userWithAvatar.name && { name: userWithAvatar.name }),
+            ...(userWithAvatar.avatar && { avatar: userWithAvatar.avatar }),
+          });
+        }
+      }),
+      catchError(this.handleError)
+    );
+  }
+
+  private applyAvatarToUser<T extends { avatar?: string | null }>(user: T): T {
+    if (!user) {
+      return user;
+    }
+
+    const resolvedAvatar = this.resolveAvatarUrl(user.avatar);
+    if (!resolvedAvatar) {
+      const { avatar, ...rest } = user as any;
+      return rest;
+    }
+
+    return {
+      ...user,
+      avatar: resolvedAvatar
+    };
+  }
+
+  private resolveAvatarUrl(avatar?: string | null): string | undefined {
+    if (!avatar) {
+      return undefined;
+    }
+
+    if (/^https?:\/\//i.test(avatar) || avatar.startsWith('data:')) {
+      return avatar;
+    }
+
+    const normalizedPath = avatar.startsWith('/') ? avatar : `/${avatar}`;
+    return `${this.API_URL}${normalizedPath}`;
   }
 
   private handleError = (error: any): Observable<never> => {

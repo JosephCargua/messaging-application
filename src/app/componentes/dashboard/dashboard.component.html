@@ -87,7 +87,7 @@
           <div *ngFor="let user of searchResults" class="search-result-item">
             <div class="avatar-container">
               <img 
-                [src]="user.avatar || ('https://ui-avatars.com/api/?name=' + encodeURI(user.name || user.email) + '&background=random')" 
+                [src]="user.avatar" 
                 [alt]="user.name || user.email" 
                 class="avatar">
               <span *ngIf="user.isOnline" class="online-indicator"></span>
@@ -134,7 +134,7 @@
         </div>
         <div *ngFor="let request of pendingRequests" class="request-item">
           <div class="avatar-container">
-            <img [src]="request.user?.avatar || ('https://ui-avatars.com/api/?name=' + encodeURI(request.user?.name || 'Usuario'))" 
+            <img [src]="request.user?.avatar" 
                  [alt]="request.user?.name" class="avatar">
           </div>
           <div class="request-info">
@@ -158,7 +158,7 @@
         </div>
         <div *ngFor="let request of sentRequests" class="request-item">
           <div class="avatar-container">
-            <img [src]="request.contact?.avatar || ('https://ui-avatars.com/api/?name=' + encodeURI(request.contact?.name || 'Usuario'))" 
+            <img [src]="request.contact?.avatar" 
                  [alt]="request.contact?.name" class="avatar">
           </div>
           <div class="request-info">
@@ -208,17 +208,24 @@
         <h3 class="profile-title">Mi Perfil</h3>
         
         <div class="profile-avatar-section">
-          <div class="avatar-preview">
+          <div class="avatar-preview" (click)="triggerAvatarUpload()" [class.uploading]="isUploadingAvatar">
             <img 
-              [src]="profileData.avatar || (currentUser && currentUser.email ? 'https://ui-avatars.com/api/?name=' + encodeURI(currentUser.email) + '&background=random' : 'https://ui-avatars.com/api/?name=Usuario&background=random')" 
+              [src]="profileAvatarUrl" 
               [alt]="profileData.name || 'Avatar'" 
               class="profile-avatar">
-            <div class="avatar-overlay">
-              <mat-icon>camera_alt</mat-icon>
-              <span>Cambiar foto</span>
+            <div class="avatar-overlay" [class.visible]="isUploadingAvatar">
+              <mat-icon *ngIf="!isUploadingAvatar">camera_alt</mat-icon>
+              <mat-icon *ngIf="isUploadingAvatar">hourglass_top</mat-icon>
+              <span>{{ isUploadingAvatar ? 'Subiendo...' : 'Cambiar foto' }}</span>
             </div>
           </div>
-          <p class="avatar-note">* La funcionalidad de subir imagen se implementará próximamente</p>
+          <input 
+            type="file" 
+            accept="image/png,image/jpeg,image/webp" 
+            #avatarInput 
+            (change)="onAvatarSelected($event)" 
+            hidden>
+          <p class="avatar-note">* Puedes subir una imagen JPG, PNG o WEBP (máx. 2 MB)</p>
         </div>
 
         <div class="profile-form">

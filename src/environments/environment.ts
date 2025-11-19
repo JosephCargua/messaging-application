@@ -11,7 +11,8 @@ export const environment = {
         github: '/auth/github',
         microsoft: '/auth/microsoft',
         callback: '/auth/oauth/callback',
-        me: '/auth/me'
+        me: '/auth/me',
+        avatarUpload: '/auth/me/avatar'
       },
       users: '/users'
     }
