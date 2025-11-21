@@ -56,6 +56,16 @@ export interface MessagesReadEvent {
   timestamp: string;
 }
 
+export interface UserBlockedEvent {
+  by: number;
+  timestamp: string;
+}
+
+export interface UserUnblockedEvent {
+  by: number;
+  timestamp: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -73,6 +83,8 @@ export class WebSocketService {
   private contactRemoved$ = new Subject<ContactRemovedEvent>();
   private userTyping$ = new Subject<UserTypingEvent>();
   private messagesRead$ = new Subject<MessagesReadEvent>();
+  private userBlocked$ = new Subject<UserBlockedEvent>();
+  private userUnblocked$ = new Subject<UserUnblockedEvent>();
 
   constructor(private authService: AuthService) {}
 
@@ -133,6 +145,8 @@ export class WebSocketService {
     this.socket.off('contact_removed');
     this.socket.off('user_typing');
     this.socket.off('messages_read');
+    this.socket.off('user_blocked');
+    this.socket.off('user_unblocked');
 
     // Escuchar eventos
     this.socket.on('friend_request_received', (data: FriendRequestReceivedEvent) => {
@@ -169,6 +183,14 @@ export class WebSocketService {
 
     this.socket.on('messages_read', (data: MessagesReadEvent) => {
       this.messagesRead$.next(data);
+    });
+
+    this.socket.on('user_blocked', (data: UserBlockedEvent) => {
+      this.userBlocked$.next(data);
+    });
+
+    this.socket.on('user_unblocked', (data: UserUnblockedEvent) => {
+      this.userUnblocked$.next(data);
     });
   }
 
@@ -226,6 +248,14 @@ export class WebSocketService {
 
   onMessagesRead(): Observable<MessagesReadEvent> {
     return this.messagesRead$.asObservable();
+  }
+
+  onUserBlocked(): Observable<UserBlockedEvent> {
+    return this.userBlocked$.asObservable();
+  }
+
+  onUserUnblocked(): Observable<UserUnblockedEvent> {
+    return this.userUnblocked$.asObservable();
   }
 
   /**

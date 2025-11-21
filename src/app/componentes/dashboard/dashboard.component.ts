@@ -9,12 +9,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatDialogModule, MatDialog, MatDialogRef, MatDialogConfig } from '@angular/material/dialog';
 import { AuthService } from '../../core/services/auth.service';
-import { Contact, FriendRequest, User } from '../../core/services/contacts.service';
+import { ContactsService, Contact, FriendRequest, User, BlockedUser } from '../../core/services/contacts.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { DashboardDataService } from '../../core/services/dashboard-data.service';
 import { DisplayChat, DisplayMessage, ProfileData } from '../../core/models/auth.module';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -113,11 +114,62 @@ export class DashboardComponent implements OnInit, OnDestroy {
     );
   }
 
+  get isActiveChatBlocked(): boolean {
+    return this.activeChat ? this.isUserBlocked(this.activeChat.contactId) : false;
+  }
+
+  getActiveChatAvatar(): string | undefined {
+    if (!this.activeChat) return undefined;
+    
+    // Si el avatar está vacío o es null/undefined, generar uno de fallback
+    if (!this.activeChat.avatar || this.activeChat.avatar.trim().length === 0) {
+      return this.dashboardDataService.buildFallbackAvatar(
+        this.activeChat.name,
+        this.activeChat.name // Usar el nombre como fallback si no hay email disponible
+      );
+    }
+    
+    // Si el avatar no es una URL válida (no empieza con http o data), intentar resolverla
+    if (!this.activeChat.avatar.startsWith('http') && !this.activeChat.avatar.startsWith('data:')) {
+      return this.dashboardDataService.resolveAvatar(
+        this.activeChat.avatar,
+        this.activeChat.name,
+        this.activeChat.name
+      );
+    }
+    
+    return this.activeChat.avatar;
+  }
+
+  onAvatarError(event: Event, name?: string): void {
+    const img = event.target as HTMLImageElement;
+    
+    // Si la imagen ya es un avatar de fallback, no hacer nada para evitar loops infinitos
+    if (img.src && img.src.includes('ui-avatars.com')) {
+      return;
+    }
+    
+    // Si hay un nombre, usar el avatar de fallback
+    if (name) {
+      img.src = this.dashboardDataService.buildFallbackAvatar(name);
+    } else {
+      // Si no hay nombre, usar un avatar genérico
+      img.src = this.dashboardDataService.buildFallbackAvatar('Usuario');
+    }
+    
+    // Prevenir que se siga intentando cargar la imagen original
+    img.onerror = null;
+  }
+
+  blockedUsers: Set<number> = new Set();
+  isBlockingUser = false;
+
   constructor(
     private authService: AuthService,
     private router: Router,
     private snackBar: MatSnackBar,
-    private dashboardDataService: DashboardDataService,
+    public dashboardDataService: DashboardDataService,
+    private contactsService: ContactsService,
     private websocketService: WebSocketService,
     private dialog: MatDialog,
     private cdr: ChangeDetectorRef
@@ -143,6 +195,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadContacts();
     this.loadPendingRequests();
     this.loadSentRequests();
+    this.loadBlockedUsers();
     this.setupWebSocketListeners();
   }
 
@@ -431,6 +484,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const chat = [...this.chats, ...this.archivedChats].find(c => c.id === this.activeChatId);
     if (!chat) return;
 
+    // Verificar si el contacto está bloqueado
+    if (this.isUserBlocked(chat.contactId)) {
+      this.snackBar.open('No puedes enviar mensajes a un contacto bloqueado. Desbloquéalo para continuar.', 'Cerrar', {
+        duration: 4000,
+        horizontalPosition: 'center',
+        verticalPosition: 'top'
+      });
+      return;
+    }
+
+    // Verificar si el contacto existe en la lista de contactos válidos
+    // Si el contacto fue eliminado por bloqueo, puede que el chat exista pero no el contacto
+    const contactExists = this.contacts.some(c => c.contact.id === chat.contactId);
+    // También verificar si existe un chat activo con ese contacto (los chats pueden existir aunque el contacto fue eliminado)
+    // Si el chat existe, intentar enviar el mensaje de todas formas
+
     if (this.typingDebounceTimeout) {
       clearTimeout(this.typingDebounceTimeout);
     }
@@ -470,8 +539,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.messages.splice(messageIndex, 1);
         }
         this.messageText = messageContent;
-        this.snackBar.open(error.error?.message || 'Error al enviar el mensaje', 'Cerrar', {
-          duration: 3000,
+        
+        // Manejar errores específicos
+        let errorMessage = 'Error al enviar el mensaje';
+        if (error.error?.message) {
+          const errorMsg = error.error.message.toLowerCase();
+          // Si el error menciona que no es contacto o hay que enviar solicitud, verificar si está bloqueado
+          if ((errorMsg.includes('contacto') || errorMsg.includes('solicitud')) && this.isUserBlocked(chat.contactId)) {
+            errorMessage = 'No puedes enviar mensajes a un contacto bloqueado. Desbloquéalo para continuar.';
+          } else if (errorMsg.includes('bloqueado') || errorMsg.includes('blocked')) {
+            errorMessage = 'No puedes enviar mensajes a este contacto porque está bloqueado.';
+          } else {
+            errorMessage = error.error.message;
+          }
+        }
+        
+        this.snackBar.open(errorMessage, 'Cerrar', {
+          duration: 4000,
           horizontalPosition: 'center',
           verticalPosition: 'top'
         });
@@ -600,6 +684,30 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
     });
 
+    const userBlockedSub = this.websocketService.onUserBlocked().subscribe((event) => {
+      // Evento recibido cuando alguien me bloquea (el evento se emite al usuario bloqueado)
+      this.loadBlockedUsers();
+      this.loadChats();
+      this.loadContacts();
+      // Si estoy en un chat con la persona que me bloqueó, cerrarlo
+      if (this.activeChat?.contactId === event.by) {
+        this.activeChatId = null;
+        this.messages = [];
+        this.showDetailsPanel = false;
+      }
+      this.snackBar.open('Has sido bloqueado por un contacto', 'Cerrar', {
+        duration: 3000,
+        horizontalPosition: 'center',
+        verticalPosition: 'top'
+      });
+    });
+
+    const userUnblockedSub = this.websocketService.onUserUnblocked().subscribe((event) => {
+      this.loadBlockedUsers();
+      this.loadChats();
+      this.loadContacts();
+    });
+
     this.subscriptions.push(
       newMessageSub,
       friendRequestSub,
@@ -608,7 +716,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       userOnlineSub,
       userOfflineSub,
       userTypingSub,
-      messagesReadSub
+      messagesReadSub,
+      userBlockedSub,
+      userUnblockedSub
     );
   }
 
@@ -801,6 +911,121 @@ export class DashboardComponent implements OnInit, OnDestroy {
           horizontalPosition: 'center',
           verticalPosition: 'top'
         });
+      }
+    });
+  }
+
+  loadBlockedUsers(): void {
+    this.contactsService.getBlockedUsers().subscribe({
+      next: (response) => {
+        this.blockedUsers = new Set(response.data.map(blocked => blocked.blockedUser.id));
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        console.error('Error loading blocked users:', error);
+      }
+    });
+  }
+
+  isUserBlocked(userId: number): boolean {
+    return this.blockedUsers.has(userId);
+  }
+
+  openBlockConfirmDialog(userId: number, userName: string): void {
+    const dialogConfig: MatDialogConfig = {
+      width: '400px',
+      data: {
+        title: 'Bloquear contacto',
+        message: `¿Estás seguro de que deseas bloquear a ${userName}? No podrás enviarle mensajes`,
+        confirmText: 'Bloquear',
+        cancelText: 'Cancelar',
+        type: 'block'
+      }
+    };
+
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, dialogConfig);
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.blockUser(userId);
+      }
+    });
+  }
+
+  openUnblockConfirmDialog(userId: number, userName: string): void {
+    const dialogConfig: MatDialogConfig = {
+      width: '400px',
+      data: {
+        title: 'Desbloquear contacto',
+        message: `¿Estás seguro de que deseas desbloquear a ${userName}?`,
+        confirmText: 'Desbloquear',
+        cancelText: 'Cancelar',
+        type: 'unblock'
+      }
+    };
+
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, dialogConfig);
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.unblockUser(userId);
+      }
+    });
+  }
+
+  blockUser(userId: number): void {
+    this.isBlockingUser = true;
+    this.contactsService.blockUser(userId).subscribe({
+      next: (response) => {
+        this.blockedUsers.add(userId);
+        this.snackBar.open('Usuario bloqueado correctamente. Ya no podrás enviarle mensajes.', 'Cerrar', {
+          duration: 4000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top'
+        });
+        // No recargar chats/contactos porque el backend los elimina, solo actualizar el estado local
+        // Mantener el chat visible pero marcado como bloqueado
+        this.cdr.detectChanges();
+        this.isBlockingUser = false;
+      },
+      error: (error) => {
+        console.error('Error blocking user:', error);
+        this.snackBar.open(error.error?.message || 'Error al bloquear el usuario', 'Cerrar', {
+          duration: 3000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top'
+        });
+        this.isBlockingUser = false;
+      }
+    });
+  }
+
+  unblockUser(userId: number): void {
+    this.isBlockingUser = true;
+    this.contactsService.unblockUser(userId).subscribe({
+      next: (response) => {
+        this.blockedUsers.delete(userId);
+        this.snackBar.open('Usuario desbloqueado correctamente. Ya puedes enviarle mensajes.', 'Cerrar', {
+          duration: 3000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top'
+        });
+        // Recargar chats y contactos para sincronizar con el backend
+        // El backend puede haber recreado el contacto al desbloquear
+        this.loadBlockedUsers();
+        this.loadChats();
+        this.loadContacts();
+        this.cdr.detectChanges();
+        this.isBlockingUser = false;
+      },
+      error: (error) => {
+        console.error('Error unblocking user:', error);
+        this.snackBar.open(error.error?.message || 'Error al desbloquear el usuario', 'Cerrar', {
+          duration: 3000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top'
+        });
+        this.isBlockingUser = false;
       }
     });
   }

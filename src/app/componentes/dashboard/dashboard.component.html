@@ -3,9 +3,6 @@
   <div class="chat-list-column" [class.hidden-mobile]="isMobileView && !showChatList">
     <div class="chat-header">
       <h2>Chats</h2>
-      <button class="add-chat-btn">
-        <mat-icon>add</mat-icon>
-      </button>
     </div>
 
     <div class="search-container">
@@ -48,7 +45,7 @@
            [class.active]="chat.id === activeChatId" 
            (click)="selectChat(chat.id)">
         <div class="avatar-container">
-          <img [src]="chat.avatar" [alt]="chat.name" class="avatar">
+          <img [src]="chat.avatar" [alt]="chat.name" class="avatar" (error)="onAvatarError($event, chat.name)">
           <span *ngIf="chat.isOnline" class="online-indicator"></span>
         </div>
         <div class="chat-info">
@@ -89,7 +86,8 @@
               <img 
                 [src]="user.avatar" 
                 [alt]="user.name || user.email" 
-                class="avatar">
+                class="avatar"
+                (error)="onAvatarError($event, user.name || user.email)">
               <span *ngIf="user.isOnline" class="online-indicator"></span>
             </div>
             <div class="search-result-info">
@@ -135,7 +133,8 @@
         <div *ngFor="let request of pendingRequests" class="request-item">
           <div class="avatar-container">
             <img [src]="request.user?.avatar" 
-                 [alt]="request.user?.name" class="avatar">
+                 [alt]="request.user?.name" class="avatar"
+                 (error)="onAvatarError($event, request.user?.name || request.user?.email)">
           </div>
           <div class="request-info">
             <div class="request-name">{{ request.user?.name || request.user?.email }}</div>
@@ -159,7 +158,8 @@
         <div *ngFor="let request of sentRequests" class="request-item">
           <div class="avatar-container">
             <img [src]="request.contact?.avatar" 
-                 [alt]="request.contact?.name" class="avatar">
+                 [alt]="request.contact?.name" class="avatar"
+                 (error)="onAvatarError($event, request.contact?.name || request.contact?.email)">
           </div>
           <div class="request-info">
             <div class="request-name">{{ request.contact?.name || request.contact?.email }}</div>
@@ -183,7 +183,7 @@
            [class.active]="chat.id === activeChatId" 
            (click)="selectChat(chat.id)">
         <div class="avatar-container">
-          <img [src]="chat.avatar" [alt]="chat.name" class="avatar">
+          <img [src]="chat.avatar" [alt]="chat.name" class="avatar" (error)="onAvatarError($event, chat.name)">
           <span *ngIf="chat.isOnline" class="online-indicator"></span>
         </div>
         <div class="chat-info">
@@ -280,7 +280,7 @@
         <button *ngIf="isMobileView" class="back-btn" (click)="backToChatList()" title="Volver a chats">
           <mat-icon>arrow_back</mat-icon>
         </button>
-        <img [src]="activeChat.avatar" [alt]="activeChat.name" class="header-avatar">
+        <img [src]="getActiveChatAvatar()" [alt]="activeChat.name" class="header-avatar" (error)="onAvatarError($event, activeChat?.name)">
         <div>
           <div class="header-name">{{ activeChat.name }}</div>
           <div class="header-status" [class.online]="activeChat.isOnline">
@@ -360,7 +360,7 @@
       <!-- Indicador de "Escribiendo..." -->
       <div *ngIf="isTyping && activeChat && !isSearchMode" class="message-wrapper typing-indicator">
         <div class="message">
-          <img [src]="activeChat.avatar" [alt]="activeChat.name" class="message-avatar">
+          <img [src]="getActiveChatAvatar()" [alt]="activeChat.name" class="message-avatar" (error)="onAvatarError($event, activeChat?.name)">
           <div class="message-content">
             <div class="typing-container">
               <span class="typing-text">Escribiendo</span>
@@ -375,21 +375,30 @@
       </div>
     </div>
 
-    <div *ngIf="activeChat && !isSearchMode" class="message-input-container">
-      <button class="input-icon-btn" title="Grabar nota de voz (próximamente)">
-        <mat-icon>mic</mat-icon>
-      </button>
-      <input 
-        type="text" 
-        placeholder="Escribe un mensaje..." 
-        class="message-input"
-        [(ngModel)]="messageText"
-        (keyup.enter)="sendMessage()"
-        (input)="onMessageInput()"
-        (blur)="onMessageInputBlur()">
-      <button class="send-btn" (click)="sendMessage()" [disabled]="!messageText.trim()">
-        <mat-icon>send</mat-icon>
-      </button>
+    <div *ngIf="activeChat && !isSearchMode">
+      <!-- Mensaje informativo cuando el contacto está bloqueado -->
+      <div *ngIf="isActiveChatBlocked" class="blocked-warning">
+        <mat-icon>block</mat-icon>
+        <span>Este contacto está bloqueado. Desbloquéalo para enviarle mensajes.</span>
+      </div>
+      
+      <div class="message-input-container" [class.blocked]="isActiveChatBlocked">
+        <button class="input-icon-btn" title="Grabar nota de voz (próximamente)" [disabled]="isActiveChatBlocked">
+          <mat-icon>mic</mat-icon>
+        </button>
+        <input 
+          type="text" 
+          [placeholder]="isActiveChatBlocked ? 'No puedes enviar mensajes a un contacto bloqueado' : 'Escribe un mensaje...'" 
+          class="message-input"
+          [(ngModel)]="messageText"
+          (keyup.enter)="sendMessage()"
+          (input)="onMessageInput()"
+          (blur)="onMessageInputBlur()"
+          [disabled]="isActiveChatBlocked">
+        <button class="send-btn" (click)="sendMessage()" [disabled]="!messageText.trim() || isActiveChatBlocked">
+          <mat-icon>send</mat-icon>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -402,32 +411,13 @@
       </button>
     </div>
     <div class="details-header">
-      <img [src]="activeChat?.avatar" [alt]="activeChat?.name" class="details-avatar">
+      <img [src]="getActiveChatAvatar()" [alt]="activeChat?.name" class="details-avatar" (error)="onAvatarError($event, activeChat?.name)">
       <div class="details-name">{{ activeChat?.name }}</div>
       <div class="details-username"></div>
-      <div class="details-actions">
-        <button class="detail-action-btn"><mat-icon>launch</mat-icon></button>
-        <button class="detail-action-btn"><mat-icon>info</mat-icon></button>
-        <button class="detail-action-btn"><mat-icon>more_vert</mat-icon></button>
-      </div>
+
     </div>
 
     <div class="settings-section">
-      <div class="setting-item">
-        <mat-icon>notifications</mat-icon>
-        <span>Notificationes</span>
-        <mat-slide-toggle [(ngModel)]="notificationOn" class="toggle"></mat-slide-toggle>
-      </div>
-      <div class="setting-item">
-        <mat-icon>volume_up</mat-icon>
-        <span>Sonido</span>
-        <mat-slide-toggle [(ngModel)]="soundOn" class="toggle"></mat-slide-toggle>
-      </div>
-      <div class="setting-item">
-        <mat-icon>download</mat-icon>
-        <span>Guardar en descargas</span>
-        <mat-slide-toggle [(ngModel)]="saveToDownloadsOn" class="toggle"></mat-slide-toggle>
-      </div>
       <div class="setting-item" *ngIf="activeChat">
         <mat-icon>archive</mat-icon>
         <span>Archivar chat</span>
@@ -435,11 +425,28 @@
           <mat-icon>archive</mat-icon>
         </button>
       </div>
+      <div class="setting-item" *ngIf="activeChat">
+        <mat-icon [class.blocked-icon]="isUserBlocked(activeChat.contactId)">
+          {{ isUserBlocked(activeChat.contactId) ? 'block' : 'person_off' }}
+        </mat-icon>
+        <span>{{ isUserBlocked(activeChat.contactId) ? 'Contacto bloqueado' : 'Bloquear contacto' }}</span>
+        <button 
+          class="block-btn" 
+          [class.blocked]="isUserBlocked(activeChat.contactId)"
+          [disabled]="isBlockingUser"
+          (click)="isUserBlocked(activeChat.contactId) ? openUnblockConfirmDialog(activeChat.contactId, activeChat.name) : openBlockConfirmDialog(activeChat.contactId, activeChat.name)" 
+          [title]="isUserBlocked(activeChat.contactId) ? 'Desbloquear este contacto' : 'Bloquear este contacto'">
+          <mat-icon *ngIf="!isBlockingUser">
+            {{ isUserBlocked(activeChat.contactId) ? 'block' : 'block' }}
+          </mat-icon>
+          <span *ngIf="isBlockingUser" class="loading-spinner-small"></span>
+        </button>
+      </div>
     </div>
 
 
     <div class="content-tabs">
-      <button class="content-tab active">Media</button>
+      <button class="content-tab">Media</button>
       <button class="content-tab">Link</button>
       <button class="content-tab">Docs</button>
     </div>

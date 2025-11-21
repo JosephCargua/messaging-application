@@ -228,20 +228,25 @@ export class DashboardDataService {
   }
 
   private toAbsoluteAvatar(avatar?: string | null): string | undefined {
-    if (!avatar || avatar.trim().length === 0) {
+    // Manejar null, undefined, o cadena vacía
+    if (!avatar || (typeof avatar === 'string' && avatar.trim().length === 0) || avatar === 'null' || avatar === 'undefined') {
       return undefined;
     }
 
+    // Si ya es una URL absoluta o data URI, retornarla directamente
     if (/^https?:\/\//i.test(avatar) || avatar.startsWith('data:')) {
       return avatar;
     }
 
+    // Convertir ruta relativa a absoluta
     const normalized = avatar.startsWith('/') ? avatar : `/${avatar}`;
     return `${environment.apiUrl}${normalized}`;
   }
 
   private getAvatarOrFallback(avatar?: string | null, name?: string | null, email?: string | null): string {
-    return this.toAbsoluteAvatar(avatar) ?? this.getFallbackAvatar(name, email);
+    const resolved = this.toAbsoluteAvatar(avatar);
+    // Asegurar que siempre retornamos un string válido
+    return resolved ?? this.getFallbackAvatar(name, email);
   }
 
   private getFallbackAvatar(name?: string | null, email?: string | null): string {
