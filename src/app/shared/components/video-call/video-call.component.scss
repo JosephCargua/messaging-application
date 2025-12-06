@@ -1,0 +1,275 @@
+.video-call-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.95);
+}
+
+.video-call-overlay {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-call-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.call-active {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.video-container {
+  flex: 1;
+  position: relative;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remote-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.local-video {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 200px;
+  height: 150px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: #000;
+}
+
+.local-video-placeholder {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 200px;
+  height: 150px;
+  border-radius: 12px;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.local-video-placeholder mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: white;
+  opacity: 0.7;
+}
+
+.local-video-placeholder span {
+  color: white;
+  font-size: 12px;
+  opacity: 0.8;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.call-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 30px;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.control-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.control-btn mat-icon {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+  color: white;
+}
+
+.mute-btn {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mute-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.video-btn {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.video-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.end-call-btn {
+  background: #f44336;
+}
+
+.end-call-btn:hover {
+  background: #d32f2f;
+  transform: scale(1.1);
+}
+
+.accept-btn {
+  background: #4caf50;
+}
+
+.accept-btn:hover {
+  background: #45a049;
+  transform: scale(1.1);
+}
+
+.reject-btn {
+  background: #f44336;
+}
+
+.reject-btn:hover {
+  background: #d32f2f;
+  transform: scale(1.1);
+}
+
+.call-info {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  color: white;
+  z-index: 10;
+}
+
+.contact-name {
+  display: block;
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.call-status {
+  display: block;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.call-waiting,
+.incoming-call {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.waiting-content {
+  text-align: center;
+  color: white;
+}
+
+.avatar-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 30px;
+}
+
+.avatar-placeholder mat-icon {
+  font-size: 60px;
+  width: 60px;
+  height: 60px;
+  color: white;
+  opacity: 0.7;
+}
+
+.waiting-content h3 {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 10px 0;
+}
+
+.waiting-content p {
+  font-size: 16px;
+  opacity: 0.8;
+  margin: 0 0 40px 0;
+}
+
+.incoming-controls {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+}
+
+@media (max-width: 768px) {
+  .local-video,
+  .local-video-placeholder {
+    width: 120px;
+    height: 90px;
+    bottom: 10px;
+    right: 10px;
+  }
+
+  .local-video-placeholder mat-icon {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .local-video-placeholder span {
+    font-size: 10px;
+  }
+
+  .call-controls {
+    padding: 20px;
+    gap: 15px;
+  }
+
+  .control-btn {
+    width: 48px;
+    height: 48px;
+  }
+
+  .control-btn mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+

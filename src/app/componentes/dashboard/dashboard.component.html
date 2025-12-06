@@ -280,7 +280,7 @@
         <button *ngIf="isMobileView" class="back-btn" (click)="backToChatList()" title="Volver a chats">
           <mat-icon>arrow_back</mat-icon>
         </button>
-        <img [src]="getActiveChatAvatar()" [alt]="activeChat.name" class="header-avatar" (error)="onAvatarError($event, activeChat?.name)">
+        <img [src]="getActiveChatAvatar()" [alt]="activeChat.name" class="header-avatar" (error)="onAvatarError($event, activeChat.name)">
         <div>
           <div class="header-name">{{ activeChat.name }}</div>
           <div class="header-status" [class.online]="activeChat.isOnline">
@@ -289,11 +289,17 @@
         </div>
       </div>
       <div class="chat-window-actions">
+        <button class="action-btn" (click)="startVideoCall()" title="Iniciar videollamada" [disabled]="!activeChat">
+          <mat-icon>videocam</mat-icon>
+        </button>
         <button class="action-btn" (click)="toggleSearchMode()" [class.active]="isSearchMode">
           <mat-icon>{{ isSearchMode ? 'close' : 'search' }}</mat-icon>
         </button>
         <button class="action-btn" (click)="archiveChat(activeChat.contactId)" title="Archivar chat">
           <mat-icon>archive</mat-icon>
+        </button>
+        <button class="action-btn" (click)="deleteChat(activeChat.contactId)" title="Eliminar chat">
+          <mat-icon>delete</mat-icon>
         </button>
         <button class="action-btn" (click)="toggleDetailsPanel()" [class.active]="showDetailsPanel">
           <mat-icon>more_vert</mat-icon>
@@ -339,8 +345,23 @@
         <div class="message" [class.current-user]="message.isCurrentUser" (contextmenu)="$event.preventDefault()">
           <img *ngIf="!message.isCurrentUser" [src]="message.avatar" [alt]="message.sender" class="message-avatar">
           <div class="message-content">
-            <div class="message-text">{{ message.text }}</div>
-            <img *ngIf="message.image" [src]="message.image" class="message-image" alt="Message image">
+            <div *ngIf="message.forwardedFrom" class="forwarded-indicator">
+              <mat-icon>forward</mat-icon>
+              <span>Reenviado</span>
+            </div>
+            <div *ngIf="message.fileType !== 'image' && message.fileType !== 'audio'" class="message-text">{{ message.text }}</div>
+            <img *ngIf="message.image" [src]="message.image" class="message-image" alt="Message image" (error)="onImageError($event)">
+            <img *ngIf="message.fileType === 'image' && message.fileUrl" [src]="message.fileUrl" class="message-image" [alt]="message.fileName || 'Imagen'" (error)="onImageError($event)">
+            <div *ngIf="message.fileType === 'audio' && message.fileUrl" class="audio-message">
+              <div class="audio-info">
+                <mat-icon class="audio-icon">audiotrack</mat-icon>
+                <span class="audio-filename">{{ message.fileName || 'Audio' }}</span>
+              </div>
+              <audio controls [src]="message.fileUrl" preload="metadata" (error)="onAudioError($event, message.fileUrl)">
+                Tu navegador no soporta el elemento de audio.
+              </audio>
+            </div>
+            <div *ngIf="message.fileType === 'image' || message.fileType === 'audio'" class="message-text-caption">{{ message.text }}</div>
             <div class="message-footer">
               <div class="message-time">{{ message.time }}</div>
               <!-- Indicadores de visto/no visto solo para mensajes propios -->
@@ -348,6 +369,10 @@
                 <mat-icon *ngIf="message.isRead" class="read-icon" title="Leído">done_all</mat-icon>
                 <mat-icon *ngIf="!message.isRead" class="unread-icon" title="Enviado">done</mat-icon>
               </div>
+              <!-- Botón para reenviar mensaje -->
+              <button class="forward-message-btn" (click)="openForwardDialog(message.id)" title="Reenviar mensaje">
+                <mat-icon>forward</mat-icon>
+              </button>
               <!-- Botón para eliminar mensaje (solo en mensajes propios) -->
               <button *ngIf="message.isCurrentUser" class="delete-message-btn" (click)="deleteMessage(message.id)" title="Eliminar mensaje">
                 <mat-icon>delete</mat-icon>
@@ -360,7 +385,7 @@
       <!-- Indicador de "Escribiendo..." -->
       <div *ngIf="isTyping && activeChat && !isSearchMode" class="message-wrapper typing-indicator">
         <div class="message">
-          <img [src]="getActiveChatAvatar()" [alt]="activeChat.name" class="message-avatar" (error)="onAvatarError($event, activeChat?.name)">
+          <img [src]="getActiveChatAvatar()" [alt]="activeChat.name || 'Avatar'" class="message-avatar" (error)="onAvatarError($event, activeChat.name || 'Usuario')">
           <div class="message-content">
             <div class="typing-container">
               <span class="typing-text">Escribiendo</span>
@@ -382,11 +407,35 @@
         <span>Este contacto está bloqueado. Desbloquéalo para enviarle mensajes.</span>
       </div>
       
-      <div class="message-input-container" [class.blocked]="isActiveChatBlocked">
-        <button class="input-icon-btn" title="Grabar nota de voz (próximamente)" [disabled]="isActiveChatBlocked">
-          <mat-icon>mic</mat-icon>
+      <div class="message-input-container" [class.blocked]="isActiveChatBlocked" [class.recording]="isRecordingAudio">
+        <button class="input-icon-btn" (click)="triggerImageUpload()" title="Adjuntar imagen" [disabled]="isActiveChatBlocked || isRecordingAudio">
+          <mat-icon>image</mat-icon>
         </button>
         <input 
+          type="file" 
+          #fileInput 
+          accept="image/*" 
+          (change)="onFileSelected($event)" 
+          hidden>
+        <button 
+          *ngIf="!isRecordingAudio"
+          class="input-icon-btn" 
+          (click)="startAudioRecording()" 
+          title="Grabar audio" 
+          [disabled]="isActiveChatBlocked">
+          <mat-icon>mic</mat-icon>
+        </button>
+        <div *ngIf="isRecordingAudio" class="recording-controls">
+          <span class="recording-time">{{ formatRecordingTime(recordingTime) }}</span>
+          <button class="stop-recording-btn" (click)="stopAudioRecording()" title="Enviar audio">
+            <mat-icon>send</mat-icon>
+          </button>
+          <button class="cancel-recording-btn" (click)="cancelAudioRecording()" title="Cancelar grabación">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <input 
+          *ngIf="!isRecordingAudio"
           type="text" 
           [placeholder]="isActiveChatBlocked ? 'No puedes enviar mensajes a un contacto bloqueado' : 'Escribe un mensaje...'" 
           class="message-input"
@@ -395,7 +444,11 @@
           (input)="onMessageInput()"
           (blur)="onMessageInputBlur()"
           [disabled]="isActiveChatBlocked">
-        <button class="send-btn" (click)="sendMessage()" [disabled]="!messageText.trim() || isActiveChatBlocked">
+        <button 
+          *ngIf="!isRecordingAudio"
+          class="send-btn" 
+          (click)="sendMessage()" 
+          [disabled]="!messageText.trim() || isActiveChatBlocked">
           <mat-icon>send</mat-icon>
         </button>
       </div>
@@ -426,6 +479,13 @@
         </button>
       </div>
       <div class="setting-item" *ngIf="activeChat">
+        <mat-icon>delete</mat-icon>
+        <span>Eliminar chat</span>
+        <button class="delete-chat-btn" (click)="deleteChat(activeChat.contactId)" title="Eliminar este chat">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+      <div class="setting-item" *ngIf="activeChat">
         <mat-icon [class.blocked-icon]="isUserBlocked(activeChat.contactId)">
           {{ isUserBlocked(activeChat.contactId) ? 'block' : 'person_off' }}
         </mat-icon>
@@ -446,9 +506,47 @@
 
 
     <div class="content-tabs">
-      <button class="content-tab">Media</button>
-      <button class="content-tab">Link</button>
-      <button class="content-tab">Docs</button>
+      <button class="content-tab" [class.active]="activeContentTab === 'media'" (click)="activeContentTab = 'media'; loadChatMedia()">Media</button>
+      <button class="content-tab" [class.active]="activeContentTab === 'links'" (click)="activeContentTab = 'links'">Link</button>
+      <button class="content-tab" [class.active]="activeContentTab === 'docs'" (click)="activeContentTab = 'docs'">Docs</button>
+    </div>
+
+    <div *ngIf="activeContentTab === 'media'" class="media-content">
+      <div *ngIf="isLoadingMedia" class="loading-state">Cargando imágenes...</div>
+      <div *ngIf="!isLoadingMedia && chatMediaImages.length === 0" class="empty-state">
+        <mat-icon>image</mat-icon>
+        <p>No hay imágenes en este chat</p>
+      </div>
+      <div *ngIf="!isLoadingMedia && chatMediaImages.length > 0" class="media-grid">
+        <div *ngFor="let message of chatMediaImages" class="media-item" (click)="message.fileUrl && openImageModal(message.fileUrl)">
+          <img [src]="message.fileUrl" [alt]="message.fileName || 'Imagen'" class="media-thumbnail" (error)="onImageError($event)">
+          <div class="media-overlay">
+            <mat-icon>zoom_in</mat-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="activeContentTab === 'links'" class="links-content">
+      <div class="empty-state">
+        <mat-icon>link</mat-icon>
+        <p>No hay enlaces en este chat</p>
+      </div>
+    </div>
+
+    <div *ngIf="activeContentTab === 'docs'" class="docs-content">
+      <div class="empty-state">
+        <mat-icon>description</mat-icon>
+        <p>No hay documentos en este chat</p>
+      </div>
     </div>
   </div>
+
+  <!-- Video Call Component -->
+  <app-video-call 
+    *ngIf="showVideoCall" 
+    [contactId]="activeChat?.contactId || 0"
+    [contactName]="activeChat?.name || 'Usuario'"
+    (ngOnDestroy)="closeVideoCall()">
+  </app-video-call>
 </div>

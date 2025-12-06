@@ -53,6 +53,7 @@ export interface ApiResponse<T> {
   providedIn: 'root'
 })
 export class ContactsService {
+  /** Encapsula las llamadas HTTP relacionadas con contactos y bloqueos. */
   private readonly API_URL = `${environment.apiUrl}/contacts`;
 
   constructor(private http: HttpClient) {}

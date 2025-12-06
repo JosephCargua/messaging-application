@@ -515,6 +515,88 @@
 }
 
 .message-image {
+  max-width: 300px;
+  max-height: 300px;
+  border-radius: 8px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  display: block;
+  object-fit: contain;
+  cursor: pointer;
+}
+
+.message-image:hover {
+  opacity: 0.9;
+}
+
+.audio-message {
+  margin-top: 8px;
+  margin-bottom: 4px;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.audio-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.audio-icon {
+  color: #757575;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.audio-filename {
+  font-size: 14px;
+  color: #424242;
+  font-weight: 500;
+}
+
+.audio-message audio {
+  width: 100%;
+  max-width: 300px;
+}
+
+.forwarded-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #757575;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.forwarded-indicator mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.message-text-caption {
+  font-size: 12px;
+  color: #757575;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.image-error {
+  padding: 8px;
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.message-image {
   width: 100%;
   max-width: 300px;
   border-radius: 8px;
@@ -584,6 +666,36 @@
 }
 
 .delete-message-btn mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.forward-message-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.4);
+  padding: 2px 4px;
+  margin-left: 2px;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.message:hover .forward-message-btn {
+  opacity: 1;
+}
+
+.forward-message-btn:hover {
+  color: #1976d2;
+  background: rgba(25, 118, 210, 0.1);
+}
+
+.forward-message-btn mat-icon {
   font-size: 16px;
   width: 16px;
   height: 16px;
@@ -749,6 +861,56 @@
 
 .send-btn:hover {
   background: #1565c0;
+}
+
+.message-input-container.recording {
+  background: #ffebee;
+  border-top-color: #f44336;
+}
+
+.recording-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  padding: 0 10px;
+}
+
+.recording-time {
+  font-weight: 600;
+  color: #f44336;
+  font-size: 14px;
+  min-width: 50px;
+  text-align: center;
+}
+
+.stop-recording-btn,
+.cancel-recording-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.stop-recording-btn {
+  color: #4caf50;
+}
+
+.stop-recording-btn:hover {
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.cancel-recording-btn {
+  color: #f44336;
+}
+
+.cancel-recording-btn:hover {
+  background: rgba(244, 67, 54, 0.1);
 }
 
 /* Right Column */
@@ -986,6 +1148,95 @@
 
 .member-arrow {
   color: #757575;
+}
+
+.media-content,
+.links-content,
+.docs-content {
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.media-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.media-item:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
+.media-item:hover .media-overlay {
+  opacity: 1;
+}
+
+.media-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.media-overlay mat-icon {
+  color: white;
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #757575;
+  text-align: center;
+}
+
+.empty-state mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  color: #bdbdbd;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #757575;
+  font-size: 14px;
 }
 
 .content-tabs {
