@@ -70,6 +70,15 @@ export interface DisplayMessage {
   image?: string;
   isRead?: boolean;
   readAt?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  forwardedFrom?: {
+    id: number;
+    content: string;
+    sender: string;
+  };
 }
 
 export interface ProfileData {

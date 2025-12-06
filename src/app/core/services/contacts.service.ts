@@ -53,6 +53,7 @@ export interface ApiResponse<T> {
   providedIn: 'root'
 })
 export class ContactsService {
+  /** Encapsula las llamadas HTTP relacionadas con contactos y bloqueos. */
   private readonly API_URL = `${environment.apiUrl}/contacts`;
 
   constructor(private http: HttpClient) {}
@@ -114,6 +115,33 @@ export class ContactsService {
       params: { q: query }
     });
   }
+
+  /**
+   * Bloquear un usuario
+   */
+  blockUser(userId: number): Observable<ApiResponse<BlockedUser>> {
+    return this.http.post<ApiResponse<BlockedUser>>(`${this.API_URL}/block`, { userId });
+  }
+
+  /**
+   * Desbloquear un usuario
+   */
+  unblockUser(userId: number): Observable<ApiResponse<{ message: string; unblockedUser: User }>> {
+    return this.http.post<ApiResponse<{ message: string; unblockedUser: User }>>(`${this.API_URL}/unblock/${userId}`, {});
+  }
+
+  /**
+   * Obtener lista de usuarios bloqueados
+   */
+  getBlockedUsers(): Observable<ApiResponse<BlockedUser[]>> {
+    return this.http.get<ApiResponse<BlockedUser[]>>(`${this.API_URL}/blocked`);
+  }
+}
+
+export interface BlockedUser {
+  id: number;
+  blockedUser: User;
+  createdAt: string;
 }
 
 export interface User {

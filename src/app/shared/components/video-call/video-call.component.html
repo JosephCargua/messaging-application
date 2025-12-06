@@ -1,0 +1,67 @@
+<div class="video-call-container" *ngIf="isCallActive || isCalling || isIncomingCall || (contactId && contactId > 0)">
+  <div class="video-call-overlay">
+    <div class="video-call-content">
+      <!-- Pantalla de llamada activa -->
+      <div *ngIf="isCallActive" class="call-active">
+        <div class="video-container">
+          <video #remoteVideo autoplay playsinline class="remote-video"></video>
+          <video #localVideo autoplay playsinline muted class="local-video" *ngIf="hasVideoTrack && isVideoEnabled"></video>
+          <div class="local-video-placeholder" *ngIf="!hasVideoTrack || !isVideoEnabled">
+            <mat-icon>person</mat-icon>
+            <span>{{ contactName }}</span>
+          </div>
+        </div>
+        <div class="call-controls">
+          <button class="control-btn mute-btn" (click)="toggleMute()" title="Silenciar/Activar micrófono">
+            <mat-icon>mic</mat-icon>
+          </button>
+          <button class="control-btn video-btn" (click)="toggleVideo()" [title]="hasVideoTrack && isVideoEnabled ? 'Desactivar cámara' : 'Activar cámara'">
+            <mat-icon>{{ hasVideoTrack && isVideoEnabled ? 'videocam' : 'videocam_off' }}</mat-icon>
+          </button>
+          <button class="control-btn end-call-btn" (click)="endCall()" title="Finalizar llamada">
+            <mat-icon>call_end</mat-icon>
+          </button>
+        </div>
+        <div class="call-info">
+          <span class="contact-name">{{ displayName }}</span>
+          <span class="call-status">En llamada</span>
+        </div>
+      </div>
+
+      <!-- Pantalla de llamando -->
+      <div *ngIf="isCalling && !isCallActive" class="call-waiting">
+        <div class="waiting-content">
+          <div class="avatar-placeholder">
+            <mat-icon>person</mat-icon>
+          </div>
+          <h3>{{ displayName }}</h3>
+          <p>Llamando...</p>
+          <button class="control-btn end-call-btn" (click)="endCall()" title="Cancelar llamada">
+            <mat-icon>call_end</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- Pantalla de llamada entrante -->
+      <div *ngIf="isIncomingCall && !isCallActive && !isCalling" class="incoming-call">
+        <div class="waiting-content">
+          <div class="avatar-placeholder">
+            <mat-icon>person</mat-icon>
+          </div>
+          <h3>{{ displayName }}</h3>
+          <p>Llamada entrante</p>
+          <div class="incoming-controls">
+            <button class="control-btn accept-btn" (click)="acceptCall()" title="Aceptar llamada">
+              <mat-icon>call</mat-icon>
+            </button>
+            <button class="control-btn reject-btn" (click)="rejectCall()" title="Rechazar llamada">
+              <mat-icon>call_end</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+

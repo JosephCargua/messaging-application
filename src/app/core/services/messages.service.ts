@@ -12,6 +12,21 @@ export interface Message {
   readAt?: string;
   createdAt: string;
   updatedAt: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  forwardedFromId?: number;
+  forwardedFrom?: {
+    id: number;
+    content: string;
+    sender: {
+      id: number;
+      email: string;
+      name: string;
+      avatar?: string;
+    };
+  };
   sender: {
     id: number;
     email: string;
@@ -42,6 +57,10 @@ export interface Chat {
 export interface SendMessageRequest {
   receiverId: number;
   content: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
 }
 
 export interface ApiResponse<T> {
@@ -52,6 +71,7 @@ export interface ApiResponse<T> {
 @Injectable({
   providedIn: 'root'
 })
+/** Servicio HTTP para interactuar con los endpoints de mensajería. */
 export class MessagesService {
   private readonly API_URL = `${environment.apiUrl}/messages`;
 
@@ -128,6 +148,32 @@ export class MessagesService {
    */
   markMessagesAsRead(contactId: number): Observable<ApiResponse<{ messageIds: number[]; count: number }>> {
     return this.http.post<ApiResponse<{ messageIds: number[]; count: number }>>(`${this.API_URL}/${contactId}/read`, {});
+  }
+
+  /**
+   * Reenviar un mensaje
+   */
+  forwardMessage(receiverId: number, originalMessageId: number): Observable<ApiResponse<Message>> {
+    return this.http.post<ApiResponse<Message>>(`${this.API_URL}/forward`, {
+      receiverId,
+      originalMessageId,
+    });
+  }
+
+  /**
+   * Eliminar un chat completo
+   */
+  deleteChat(contactId: number): Observable<ApiResponse<any>> {
+    return this.http.delete<ApiResponse<any>>(`${this.API_URL}/chats/${contactId}`);
+  }
+
+  /**
+   * Subir archivo (imagen o audio)
+   */
+  uploadFile(file: File): Observable<ApiResponse<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<ApiResponse<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }>>(`${this.API_URL}/upload`, formData);
   }
 }
 

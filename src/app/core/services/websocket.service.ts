@@ -56,9 +56,22 @@ export interface MessagesReadEvent {
   timestamp: string;
 }
 
+export interface UserBlockedEvent {
+  by: number;
+  timestamp: string;
+}
+
+export interface UserUnblockedEvent {
+  by: number;
+  timestamp: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
+/**
+ * Administra la conexión Socket.IO y expone observables para eventos en tiempo real.
+ */
 export class WebSocketService {
   private socket: Socket | null = null;
   private isConnected = false;
@@ -73,6 +86,8 @@ export class WebSocketService {
   private contactRemoved$ = new Subject<ContactRemovedEvent>();
   private userTyping$ = new Subject<UserTypingEvent>();
   private messagesRead$ = new Subject<MessagesReadEvent>();
+  private userBlocked$ = new Subject<UserBlockedEvent>();
+  private userUnblocked$ = new Subject<UserUnblockedEvent>();
 
   constructor(private authService: AuthService) {}
 
@@ -133,6 +148,8 @@ export class WebSocketService {
     this.socket.off('contact_removed');
     this.socket.off('user_typing');
     this.socket.off('messages_read');
+    this.socket.off('user_blocked');
+    this.socket.off('user_unblocked');
 
     // Escuchar eventos
     this.socket.on('friend_request_received', (data: FriendRequestReceivedEvent) => {
@@ -170,6 +187,14 @@ export class WebSocketService {
     this.socket.on('messages_read', (data: MessagesReadEvent) => {
       this.messagesRead$.next(data);
     });
+
+    this.socket.on('user_blocked', (data: UserBlockedEvent) => {
+      this.userBlocked$.next(data);
+    });
+
+    this.socket.on('user_unblocked', (data: UserUnblockedEvent) => {
+      this.userUnblocked$.next(data);
+    });
   }
 
   /**
@@ -192,45 +217,65 @@ export class WebSocketService {
   }
 
   // Observables para eventos
+  /** Observable del evento cuando se recibe una solicitud de amistad. */
   onFriendRequestReceived(): Observable<FriendRequestReceivedEvent> {
     return this.friendRequestReceived$.asObservable();
   }
 
+  /** Evento que indica que aceptaron una solicitud enviada. */
   onFriendRequestAccepted(): Observable<FriendRequestAcceptedEvent> {
     return this.friendRequestAccepted$.asObservable();
   }
 
+  /** Evento que indica que rechazaron una solicitud enviada. */
   onFriendRequestRejected(): Observable<FriendRequestRejectedEvent> {
     return this.friendRequestRejected$.asObservable();
   }
 
+  /** Evento para mensajes entrantes en tiempo real. */
   onNewMessage(): Observable<NewMessageEvent> {
     return this.newMessage$.asObservable();
   }
 
+  /** Notifica cuando un usuario se conecta. */
   onUserOnline(): Observable<UserOnlineEvent> {
     return this.userOnline$.asObservable();
   }
 
+  /** Notifica cuando un usuario se desconecta. */
   onUserOffline(): Observable<UserOfflineEvent> {
     return this.userOffline$.asObservable();
   }
 
+  /** Evento emitido cuando se elimina la relación de contacto. */
   onContactRemoved(): Observable<ContactRemovedEvent> {
     return this.contactRemoved$.asObservable();
   }
 
+  /** Emite cambios del estado "está escribiendo". */
   onUserTyping(): Observable<UserTypingEvent> {
     return this.userTyping$.asObservable();
   }
 
+  /** Evento cuando el contacto marca mensajes como leídos. */
   onMessagesRead(): Observable<MessagesReadEvent> {
     return this.messagesRead$.asObservable();
+  }
+
+  /** Notifica si el usuario actual fue bloqueado por alguien. */
+  onUserBlocked(): Observable<UserBlockedEvent> {
+    return this.userBlocked$.asObservable();
+  }
+
+  /** Notifica si el usuario actual fue desbloqueado. */
+  onUserUnblocked(): Observable<UserUnblockedEvent> {
+    return this.userUnblocked$.asObservable();
   }
 
   /**
    * Emitir evento de que el usuario está escribiendo
    */
+  /** Emite al servidor que el usuario comenzó a escribir a un contacto. */
   emitTypingStart(receiverId: number): void {
     if (this.socket && this.isConnected) {
       this.socket.emit('typing_start', { receiverId });
@@ -240,6 +285,7 @@ export class WebSocketService {
   /**
    * Emitir evento de que el usuario dejó de escribir
    */
+  /** Indica que el usuario dejó de escribir al contacto indicado. */
   emitTypingStop(receiverId: number): void {
     if (this.socket && this.isConnected) {
       this.socket.emit('typing_stop', { receiverId });
@@ -249,6 +295,7 @@ export class WebSocketService {
   /**
    * Verificar si está conectado
    */
+  /** Indica si el socket mantiene una conexión activa. */
   getIsConnected(): boolean {
     return this.isConnected && (this.socket?.connected ?? false);
   }
